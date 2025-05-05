@@ -6,6 +6,7 @@ import mongoose from 'mongoose'
 const userSchema = new mongoose.Schema({
 	classroll: { type: Number, required: true, unique: true },
 	email: { type: String, required: true, unique: true },
+	verificationCode: {type: String},
 	is_email_verified: { type: Boolean },
 	password: { type: String, required: true },
 	phone: { type: Number },

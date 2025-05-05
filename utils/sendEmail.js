@@ -31,7 +31,7 @@ const sendEmail = async ({ emailTo, subject, code, content }) => {
             <p style="font-size: 14px; color: #777;">
               This code will expire in 10 minutes. If you didn’t request this, please ignore this email.
             </p>
-            <p style="font-size: 14px; color: #999; margin-top: 40px;">— Your Team</p>
+            <p style="font-size: 14px; color: #999; margin-top: 40px;">— pcIST</p>
           </div>
         `
     };
