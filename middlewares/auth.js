@@ -20,7 +20,6 @@ const auth = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
     // Find user by slug
     const user = await userModel.findOne({ slug });
     if (!user) {
