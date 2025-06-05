@@ -9,6 +9,8 @@ const addEvent = async (req, res) => {
       date: date,
       location: location,
       description: description,
+      image: req.file?.path,
+      imagePublicId: req.file?.filename,
     });
     res.status(200).json({ message: "New event created" });
   } catch (e) {

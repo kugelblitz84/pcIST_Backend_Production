@@ -20,6 +20,12 @@ const eventSchema = new mongoose.Schema(
         },
         description:{
             type: String,
+        },
+        image:{
+            type: String,
+        },
+        imagePublicId: {
+            type: String,
         }
     },
     {

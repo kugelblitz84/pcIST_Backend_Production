@@ -161,7 +161,7 @@ const login = async (req, res) => {
     // Send the token and user data in the response
     res.status(200).json({
       status: true,
-      message: "Login successfull",
+      message: "Login statusfull",
       token: token,
       slug: user.slug,
     });
