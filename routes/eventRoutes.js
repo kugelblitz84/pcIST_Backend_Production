@@ -1,8 +1,7 @@
 import express from 'express'
 import parser from '../middlewares/multer.js';
-import eventController from '../controllers/eventController.js'
+import {addEvent, getEvents, GetOneEventUsingId, updateEvent, deleteEvent} from '../controllers/eventController.js'
 import adminAuth from '../middlewares/adminAuth.js';
-const {addEvent, getEvents, GetOneEventUsingId, updateEvent, deleteEvent} = eventController
 
 const eventRoutes = express.Router()
 
