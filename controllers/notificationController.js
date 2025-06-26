@@ -1,4 +1,4 @@
-import axios from 'axios';
+
 import admin from '../configs/firebase';
 
 
@@ -7,7 +7,7 @@ const notifyOneUser = async (req, res) => {
     const fcmToken = req.params.token
     const {title, message} = req.body
    const messageJson = {
-        to: fcmToken,
+        token: fcmToken,
         notification: {
           title: title,
           body: message,
@@ -19,7 +19,7 @@ const notifyOneUser = async (req, res) => {
       }
     const response = await admin.messaging().send(messageJson);
 
-    
+
     console.log('Notification sent:', response.data);
   } catch (error) {
     console.error('Error sending FCM notification:', error.response?.data || error.message);
@@ -30,7 +30,7 @@ const notifyAllUsers = async (req, res) => {
     try{
         const {title, message} = req.body;
         const messageJson = {
-        to: '/topics/all_users',
+        topic: '/topics/all_users',
         notification: {
           title: title,
           body: message,

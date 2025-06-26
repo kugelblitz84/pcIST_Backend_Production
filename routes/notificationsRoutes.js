@@ -1,5 +1,5 @@
 import express from 'express'
-
+import { notifyAllUsers, notifyOneUser } from '../controllers/notificationController';
 
 const NotificationRouter = express.Router()
 
