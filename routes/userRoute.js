@@ -24,8 +24,8 @@ userRouter.post("/verify-user", auth, verifyUser);
 userRouter.post("/send-forgot-password-email", sendForgotPasswordCode);
 userRouter.post("/recover-password", recoverPassword);
 userRouter.put("/update-profile", auth, updateProfile);
-userRouter.post("/get-user-data", auth, getUserData);
-userRouter.post("/get-user-data-admin", adminAuth, getUserData);
+userRouter.post("/get-user-data", getUserData);
+//userRouter.post("/get-user-data-admin", adminAuth, getUserData);
 userRouter.post("/register-for-event/:id", auth, registerForEvent);
 
 export default userRouter;

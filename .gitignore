@@ -137,3 +137,6 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# firebase file
+pcist-f93f7-firebase-adminsdk-fbsvc-ba5ab5cee3.json
