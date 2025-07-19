@@ -5,6 +5,7 @@ import 'dotenv/config'
 // import connectCloudinary from './configs/cloudinary.js'
 import userRouter from './routes/userRoute.js'
 import eventRoutes from './routes/eventRoutes.js'
+import NotificationRouter from './routes/notificationsRoutes.js'
 
 const app = express()
 const port = process.env.PORT || 4000;
@@ -20,6 +21,7 @@ app.use(cors())
 // auth route
 app.use('/api/v1/user', userRouter);
 app.use('/api/v1/event', eventRoutes);
+app.use('/api/v1/notification', NotificationRouter);
 
 app.get('/', (req, res)=>{
 	res.send("API Working")

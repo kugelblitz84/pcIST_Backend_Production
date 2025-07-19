@@ -1,5 +1,5 @@
 
-import admin from '../configs/firebase';
+import admin from '../configs/firebase.js';
 
 
 const notifyOneUser = async (req, res) => {
@@ -27,26 +27,29 @@ const notifyOneUser = async (req, res) => {
 };
 
 const notifyAllUsers = async (req, res) => {
-    try{
-        const {title, message} = req.body;
-        const messageJson = {
-        topic: '/topics/all_users',
-        notification: {
-          title: title,
-          body: message,
-        },
-        data: {
-          click_action: 'FLUTTER_NOTIFICATION_CLICK',
-          status: 'done',
-        },
-      }
-        const response = await admin.messaging().send(messageJson);
+  try {
+    const { title, message } = req.body;
 
-    console.log('Notification sent:', response.data);
-}catch(e){
-    console.error('Error sending FCM notification:', error.response?.data || error.message)
-}
-    
-}
+    const messageJson = {
+      topic: 'all_users',
+      notification: {
+        title,
+        body: message,
+      },
+      data: {
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        status: 'done',
+      },
+    };
+
+    const response = await admin.messaging().send(messageJson);
+
+    console.log('Notification sent:', response);
+    res.status(200).json({ success: true, message: 'Notification sent', response });
+  } catch (error) {
+    console.error('Error sending FCM notification:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to send notification', error: error.message });
+  }
+};
 
 export {notifyAllUsers, notifyOneUser};
