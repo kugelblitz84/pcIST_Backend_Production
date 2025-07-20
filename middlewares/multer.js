@@ -9,13 +9,13 @@ const storage = multer.diskStorage({
   },
 });
 
-const parser = multer({ storage });
+const uploadEventImages = multer({ storage }).array("images", 30);
 
-const uploadEventImages = parser.fields([
-  { name: 'image1', maxCount: 1 },
-  { name: 'image2', maxCount: 1 },
-  { name: 'image3', maxCount: 1 },
-  { name: 'image4', maxCount: 1 },
-]);
+// const uploadEventImages = parser.fields([
+//   { name: 'image1', maxCount: 1 },
+//   { name: 'image2', maxCount: 1 },
+//   { name: 'image3', maxCount: 1 },
+//   { name: 'image4', maxCount: 1 },
+// ]);
 
 export default uploadEventImages;
