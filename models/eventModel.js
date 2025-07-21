@@ -58,7 +58,7 @@ const eventSchema = new mongoose.Schema(
   }
 );
 
-const gallerySchema = mongoose.Schema(
+const gallerySchema = new mongoose.Schema(
   {
     images: [
       {
@@ -79,4 +79,4 @@ const gallerySchema = mongoose.Schema(
 const events = mongoose.model("events", eventSchema);
 const eventGallery = mongoose.model("gallery", gallerySchema);
 
-export default {events, eventGallery};
+export {events, eventGallery};
