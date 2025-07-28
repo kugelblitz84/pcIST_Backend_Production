@@ -1,6 +1,7 @@
-import {events, eventGallery} from "../models/eventModel.js";
-//import eventGallery from "../models/eventModel.js"
-import cloudinary from '../configs/cloudinary.js';
+import { soloEvents, teamEvents, eventGallery } from "../models/eventModel.js";
+import cloudinary from "../configs/cloudinary.js";
+import mongoose from "mongoose";
+
 const addEvent = async (req, res) => {
   try {
     const {
@@ -11,18 +12,13 @@ const addEvent = async (req, res) => {
       description,
       needMembership,
     } = req.body;
-    // const image1 = req.files.image1 && req.files.image1[0];
-    // const image2 = req.files.image2 && req.files.image2[0];
-    // const image3 = req.files.image3 && req.files.image3[0];
-    // const image4 = req.files.image4 && req.files.image4[0];
 
     const images = req.files;
-
     let imagesUrl = await Promise.all(
       images.map(async (item) => {
         let result = await cloudinary.uploader.upload(item.path, {
           resource_type: "image",
-          folder: "Event banners"
+          folder: "Event banners",
         });
         return {
           url: result.secure_url,
@@ -31,17 +27,23 @@ const addEvent = async (req, res) => {
       })
     );
 
-    await events.create({
-      eventName: eventName,
-      eventType: eventType,
-      date: date,
-      location: location,
-      description: description,
+    const newEventData = {
+      eventName,
+      date,
+      location,
+      description,
       images: imagesUrl,
-      //imagePublicId: req.file?.filename,
-      needMembership: needMembership,
-      registeredMembers: [],
-    });
+      needMembership,
+    };
+
+    if (eventType === "solo") {
+      await soloEvents.create({ ...newEventData, registeredMembers: [] });
+    } else if (eventType === "team") {
+      await teamEvents.create({ ...newEventData, registeredTeams: [] });
+    } else {
+      return res.status(400).json({ message: "Invalid event type" });
+    }
+
     res.status(200).json({ message: "New event created" });
   } catch (e) {
     res.status(500).json({ message: e.message });
@@ -50,10 +52,12 @@ const addEvent = async (req, res) => {
 
 const getEvents = async (req, res) => {
   try {
-    const allEvents = await events.find();
+    const solo = await soloEvents.find();
+    const team = await teamEvents.find();
     res.status(200).json({
-      message: "These are all the current ongoing events",
-      data: allEvents,
+      message: "All current events",
+      soloEvents: solo,
+      teamEvents: team,
     });
   } catch (e) {
     res.status(500).json({ message: e.message });
@@ -63,10 +67,15 @@ const getEvents = async (req, res) => {
 const GetOneEventUsingId = async (req, res) => {
   try {
     const eventID = req.params.id;
-    const event = await events.findById(eventID);
+
+    let event = await soloEvents.findById(eventID);
     if (!event) {
-      return res.status(404).json({ message: "No Event Found" });
+      event = await teamEvents.findById(eventID);
+      if (!event) {
+        return res.status(404).json({ message: "No Event Found" });
+      }
     }
+
     return res.status(200).json({
       message: "Event found",
       data: event,
@@ -81,19 +90,16 @@ const updateEvent = async (req, res) => {
     const eventId = req.params.id;
     const { eventName, date, description, location } = req.body;
 
-    // Create an object with only the fields provided
     const updateFields = {};
     if (eventName) updateFields.eventName = eventName;
     if (date) updateFields.date = date;
     if (description) updateFields.description = description;
     if (location) updateFields.location = location;
 
-    // Update the event document
-    const updatedEvent = await events.findByIdAndUpdate(
-      eventId,
-      { $set: updateFields },
-      { new: true } // Return the updated document
-    );
+    let updatedEvent = await soloEvents.findByIdAndUpdate(eventId, { $set: updateFields }, { new: true });
+    if (!updatedEvent) {
+      updatedEvent = await teamEvents.findByIdAndUpdate(eventId, { $set: updateFields }, { new: true });
+    }
 
     if (!updatedEvent) {
       return res.status(404).json({ message: "Event not found" });
@@ -112,7 +118,10 @@ const deleteEvent = async (req, res) => {
   try {
     const eventId = req.params.id;
 
-    const deletedEvent = await events.findByIdAndDelete(eventId);
+    let deletedEvent = await soloEvents.findByIdAndDelete(eventId);
+    if (!deletedEvent) {
+      deletedEvent = await teamEvents.findByIdAndDelete(eventId);
+    }
 
     if (!deletedEvent) {
       return res.status(404).json({ message: "Event not found" });
@@ -127,113 +136,105 @@ const deleteEvent = async (req, res) => {
   }
 };
 
-const registerForEvent = async (req, res) => {
+const registerForSoloEvent = async (req, res) => {
   try {
-    const userId = req.user.id; // Authenticated user's ID
-    const eventId = req.params.id; // Event ID from URL
+    const userId = req.user.id;
+    const eventId = req.params.id;
+    const { Name } = req.body;
 
-    const event = await events.findById(eventId);
-    if (!event) {
-      return res.status(404).json({ message: "Event not found" });
+    const event = await soloEvents.findById(eventId);
+    if (!event) return res.status(404).json({ message: "Event not found" });
+
+    if (event.registeredMembers.some((m) => m.userId.toString() === userId)) {
+      return res.status(400).json({ message: "Already registered" });
     }
 
-    // Check if user is already registered
-    if (event.registeredMembers.includes(userId)) {
-      return res
-        .status(400)
-        .json({ message: "User already registered for this event" });
-    }
-
-    // Add user to registeredMembers
-    event.registeredMembers.push(userId);
+    event.registeredMembers.push({ userId, Name, paymentStatus: false });
     await event.save();
 
-    res.status(200).json({ message: "User registered for event successfully" });
+    res.status(200).json({ message: "Registered for event" });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
 };
 
+const registerForTeamEvent = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
+  try {
+    const eventId = req.params.id;
+    const { teamName, members } = req.body;
 
-const uploadImagesToGallery = async (req, res) =>{
-  try{
+    if (!teamName || !Array.isArray(members) || members.length === 0) {
+      return res.status(400).json({ message: "Invalid team data" });
+    }
+
+    const newMemberIds = members.map((m) => mongoose.Types.ObjectId(m.userId));
+
+    const existing = await teamEvents.findOne({
+      _id: eventId,
+      "registeredTeams.members.userId": { $in: newMemberIds },
+    }).session(session);
+
+    if (existing) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ message: "One or more members already registered" });
+    }
+
+    await teamEvents.updateOne(
+      { _id: eventId },
+      {
+        $push: {
+          registeredTeams: {
+            teamName,
+            members,
+          },
+        },
+      }
+    ).session(session);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({ message: "Team registered successfully" });
+  } catch (e) {
+    await session.abortTransaction();
+    session.endSession();
+    res.status(500).json({ message: e.message });
+  }
+};
+
+const uploadImagesToGallery = async (req, res) => {
+  try {
     const images = req.files;
     let imagesURL = await Promise.all(
       images.map(async (item) => {
-        let result = await cloudinary.uploader.upload(item.path,{
+        let result = await cloudinary.uploader.upload(item.path, {
           resource_type: "image",
-          folder: "Gallery"
+          folder: "Gallery",
         });
         return {
-          url : result.secure_url,
+          url: result.secure_url,
           publicId: result.public_id,
-        }
+        };
       })
-    )
-    await eventGallery.create({
-      images: imagesURL,
-    })
-    res.status(200).json({message: "Image(s) Uploaded Successfully"})
-  }catch(err){
-    res.status(500).json({message: "error When trying to upload" + err})
-    console.log("errro when uploading to gallery: "+ err);
+    );
+    await eventGallery.create({ images: imagesURL });
+    res.status(200).json({ message: "Image(s) uploaded successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error uploading: " + err });
   }
-}
+};
 
-
-
-// const addProduct = async (req, res) => {
-//     try {
-
-//         const { name, description, sales, price, category, subCategory, sizes, bestseller } = req.body
-//         const discountedPrice = sales ? (price - (price * sales / 100)) : price;
-
-//         const image1 = req.files.image1 && req.files.image1[0]
-//         const image2 = req.files.image2 && req.files.image2[0]
-//         const image3 = req.files.image3 && req.files.image3[0]
-//         const image4 = req.files.image4 && req.files.image4[0]
-
-//         const images = [image1, image2, image3, image4].filter((item)=> item !== undefined)
-
-//         let imagesUrl = await Promise.all(
-//             images.map(async (item)=>{
-//                 let result = await cloudinary.uploader.upload(item.path, {resource_type:'image'});
-//                 return result.secure_url
-//             })
-//         )
-
-//         const productData= {
-//             name,
-//             description,
-//             category,
-//             sales: Number(sales),
-//             price: Number(price),
-//             discountedPrice,
-//             subCategory,
-//             bestseller: bestseller === "true" ? true : false,
-//             sizes: JSON.parse(sizes),
-//             image: imagesUrl,
-//             date: Date.now(),
-//         }
-
-//         // console.log(productData);
-
-//         const product = new productModel(productData);
-//         await product.save()
-
-//         res.json({success: true, message:"Product Added"})
-//     } catch (error) {
-//         console.log(error);
-//         res.json({success:false, message: error.message})
-//     }
-// }
 export {
   addEvent,
   getEvents,
   GetOneEventUsingId,
   updateEvent,
   deleteEvent,
-  registerForEvent,
+  registerForSoloEvent,
+  registerForTeamEvent,
   uploadImagesToGallery,
 };

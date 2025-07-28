@@ -19,13 +19,19 @@ const registeredMembersSchema = mongoose.Schema(
   }
 );
 
-const eventSchema = new mongoose.Schema(
+const registeredTeamSchema = mongoose.Schema(
   {
-    eventName: {
+    teamName: {
       type: String,
       required: true,
     },
-    eventType: {
+    members: [registeredMembersSchema]
+  }
+)
+
+const soloEventSchema = new mongoose.Schema(
+  {
+    eventName: {
       type: String,
       required: true,
     },
@@ -58,6 +64,37 @@ const eventSchema = new mongoose.Schema(
   }
 );
 
+const teamEventSchema = new mongoose.Schema(
+  {
+    eventName: {
+      type: String,
+      required: true,
+    },
+    date: {
+      type: Date,
+      required: true,
+    },
+    location: {
+      type: String,
+      //requried: true,
+    },
+    description: {
+      type: String,
+    },
+    images: {
+      type: [{ url: { type: String }, publicId: { type: String } }],
+    },
+    needMembership: {
+      type: Boolean,
+      required: true,
+    },
+    registeredTeams: [registeredTeamSchema],
+
+  }
+)
+
+teamEventSchema.index({"registeredTeams.members.userid": 1});
+
 const gallerySchema = new mongoose.Schema(
   {
     images: [
@@ -75,8 +112,10 @@ const gallerySchema = new mongoose.Schema(
     
   
 )
-
-const events = mongoose.model("events", eventSchema);
+const teamEvents = mongoose.model("team-events", teamEventSchema);
+const soloEvents = mongoose.model("solo-events", soloEventSchema);
 const eventGallery = mongoose.model("gallery", gallerySchema);
 
-export {events, eventGallery};
+export {soloEvents, teamEvents, eventGallery};
+
+//done
