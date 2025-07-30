@@ -6,10 +6,8 @@ import connectDB from "./configs/mongodb.js";
 import userRouter from "./routes/userRoute.js";
 import eventRoutes from "./routes/eventRoutes.js";
 import NotificationRouter from "./routes/notificationsRoutes.js";
-import {task} from './controllers/userController.js';
 import http from "http";
 import { Server } from "socket.io";
-import cron from 'node-cron';
 
 const app = express();
 const server = http.createServer(app);
@@ -56,7 +54,6 @@ io.on("connection", (socket) => {
   });
 });
 
-cron.schedule("0 0 0 1 *", task);
 server.listen(port, () => {
   console.log(`Server running on port: ${port}`);
 });
