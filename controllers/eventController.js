@@ -1,6 +1,6 @@
 import { soloEvents, teamEvents, eventGallery } from "../models/eventModel.js";
 import cloudinary from "../configs/cloudinary.js";
-import mongoose from "mongoose";
+import userModel from '../models/userModel.js'
 
 const addEvent = async (req, res) => {
   try {
@@ -162,50 +162,75 @@ const registerForSoloEvent = async (req, res) => {
 };
 
 const registerForTeamEvent = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
-    const eventId = req.params.id;
-    const { teamName, members } = req.body;
+    const { eventId } = req.params;
+    const { teamName, members } = req.body; // members = ["email1", "email2", "email3"]
 
+    // Validate input
     if (!teamName || !Array.isArray(members) || members.length === 0) {
-      return res.status(400).json({ message: "Invalid team data" });
+      return res.status(400).json({ message: "Team name and members are required." });
     }
 
-    const newMemberIds = members.map((m) => mongoose.Types.ObjectId(m.userId));
+    // Check registration deadline
+    //console.log(eventId);
+    const event = await teamEvents.findById(eventId);
+    if (!event) return res.status(404).json({ message: "Event not found." });
 
-    const existing = await teamEvents.findOne({
+    const now = new Date();
+    if (now > event.registrationDeadline) {
+      return res.status(400).json({ message: "Registration deadline has passed." });
+    }
+
+    // Check if team name is already registered
+    const duplicateTeam = await teamEvents.findOne({
       _id: eventId,
-      "registeredTeams.members.userId": { $in: newMemberIds },
-    }).session(session);
+      "registeredTeams.teamName": teamName
+    });
 
-    if (existing) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ message: "One or more members already registered" });
+    if (duplicateTeam) {
+      return res.status(400).json({ message: "Team name already registered for this event." });
     }
 
-    await teamEvents.updateOne(
-      { _id: eventId },
-      {
-        $push: {
-          registeredTeams: {
-            teamName,
-            members,
-          },
-        },
+    // Process members
+    const processedMembers = [];
+
+    for (const email of members) {
+      const user = await userModel.findOne({ email: email });
+      if (!user) {
+        return res.status(404).json({ message: `User with email ${email} not found.` });
       }
-    ).session(session);
 
-    await session.commitTransaction();
-    session.endSession();
+      // Check if this user is already part of any team in the event
+      const alreadyInTeam = await teamEvents.findOne({
+        _id: eventId,
+        "registeredTeams.members.userId": user._id
+      });
 
-    res.status(200).json({ message: "Team registered successfully" });
-  } catch (e) {
-    await session.abortTransaction();
-    session.endSession();
-    res.status(500).json({ message: e.message });
+      if (alreadyInTeam) {
+        return res.status(400).json({ message: `User ${member.email} is already registered in a team.` });
+      }
+
+      processedMembers.push({
+        userId: user._id,
+        Name: user.name || "", // fallback to empty if name not found
+        paymentStatus: member.paymentStatus || false,
+      });
+    }
+
+    // Add new team
+    const newTeam = {
+      teamName,
+      members: processedMembers
+    };
+
+    event.registeredTeams.push(newTeam);
+    await event.save();
+
+    return res.status(200).json({ message: "Team registered successfully." });
+
+  } catch (error) {
+    console.error("Register team error:", error);
+    res.status(500).json({ message: "Internal server error." });
   }
 };
 

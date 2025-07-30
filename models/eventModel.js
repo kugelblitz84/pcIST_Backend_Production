@@ -101,8 +101,8 @@ const teamEventSchema = new mongoose.Schema(
   }
 )
 
-teamEventSchema.index({"registeredTeams.members.userid": 1});
-
+teamEventSchema.index({"registeredTeams.members.userId": 1});
+teamEventSchema.index({"registeredTeams.teamName": 1});
 const gallerySchema = new mongoose.Schema(
   {
     images: [
