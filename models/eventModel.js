@@ -39,6 +39,10 @@ const soloEventSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    registrationDeadline:{
+      type: Date,
+      required: true,
+    },
     location: {
       type: String,
       //requried: true,
@@ -71,6 +75,10 @@ const teamEventSchema = new mongoose.Schema(
       required: true,
     },
     date: {
+      type: Date,
+      required: true,
+    },
+    registrationDeadline: {
       type: Date,
       required: true,
     },

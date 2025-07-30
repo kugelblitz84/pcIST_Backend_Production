@@ -8,6 +8,7 @@ const addEvent = async (req, res) => {
       eventName,
       eventType,
       date,
+      registrationDeadline,
       location,
       description,
       needMembership,
@@ -30,6 +31,7 @@ const addEvent = async (req, res) => {
     const newEventData = {
       eventName,
       date,
+      registrationDeadline,
       location,
       description,
       images: imagesUrl,
@@ -88,13 +90,14 @@ const GetOneEventUsingId = async (req, res) => {
 const updateEvent = async (req, res) => {
   try {
     const eventId = req.params.id;
-    const { eventName, date, description, location } = req.body;
+    const { eventName, date, description, location, registrationDeadline } = req.body;
 
     const updateFields = {};
     if (eventName) updateFields.eventName = eventName;
     if (date) updateFields.date = date;
     if (description) updateFields.description = description;
     if (location) updateFields.location = location;
+    if (registrationDeadline) updateFields.registrationDeadline = registrationDeadline;
 
     let updatedEvent = await soloEvents.findByIdAndUpdate(eventId, { $set: updateFields }, { new: true });
     if (!updatedEvent) {
