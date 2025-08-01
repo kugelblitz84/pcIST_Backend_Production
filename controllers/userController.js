@@ -304,6 +304,14 @@ const recoverPassword = async (req, res) => {
         .json({ code: 400, status: false, message: "Code not matched" });
     }
 
+    // Password validation
+    if (password.length < 8) {
+      return res.json({
+        status: false,
+        message: "Please enter strong password and put atleast 8 characters",
+      });
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     user.password = hashedPassword;
