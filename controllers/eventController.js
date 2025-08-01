@@ -1,15 +1,51 @@
-import events from "../models/eventModel.js";
+import { soloEvents, teamEvents, eventGallery } from "../models/eventModel.js";
+import cloudinary from "../configs/cloudinary.js";
+import userModel from '../models/userModel.js'
 
 const addEvent = async (req, res) => {
   try {
-    const { eventName, eventType, date, location, description } = req.body;
-    await events.create({
-      eventName: eventName,
-      eventType: eventType,
-      date: date,
-      location: location,
-      description: description,
-    });
+    const {
+      eventName,
+      eventType,
+      date,
+      registrationDeadline,
+      location,
+      description,
+      needMembership,
+    } = req.body;
+
+    const images = req.files;
+    let imagesUrl = await Promise.all(
+      images.map(async (item) => {
+        let result = await cloudinary.uploader.upload(item.path, {
+          resource_type: "image",
+          folder: "Event banners",
+        });
+        return {
+          url: result.secure_url,
+          publicId: result.public_id,
+        };
+      })
+    );
+
+    const newEventData = {
+      eventName,
+      date,
+      registrationDeadline,
+      location,
+      description,
+      images: imagesUrl,
+      needMembership,
+    };
+
+    if (eventType === "solo") {
+      await soloEvents.create({ ...newEventData, registeredMembers: [] });
+    } else if (eventType === "team") {
+      await teamEvents.create({ ...newEventData, registeredTeams: [] });
+    } else {
+      return res.status(400).json({ message: "Invalid event type" });
+    }
+
     res.status(200).json({ message: "New event created" });
   } catch (e) {
     res.status(500).json({ message: e.message });
@@ -18,10 +54,12 @@ const addEvent = async (req, res) => {
 
 const getEvents = async (req, res) => {
   try {
-    const allEvents = await events.find();
+    const solo = await soloEvents.find();
+    const team = await teamEvents.find();
     res.status(200).json({
-      message: "These are all the current ongoing events",
-      data: allEvents,
+      message: "All current events",
+      soloEvents: solo,
+      teamEvents: team,
     });
   } catch (e) {
     res.status(500).json({ message: e.message });
@@ -31,70 +69,200 @@ const getEvents = async (req, res) => {
 const GetOneEventUsingId = async (req, res) => {
   try {
     const eventID = req.params.id;
-    const event = await events.findById(eventID)
-    if(!event){
-        return res.status(404).json({message: "No Event Found"})
+
+    let event = await soloEvents.findById(eventID);
+    if (!event) {
+      event = await teamEvents.findById(eventID);
+      if (!event) {
+        return res.status(404).json({ message: "No Event Found" });
+      }
     }
+
     return res.status(200).json({
-        message: "Event found",
-        data: event
-    })
+      message: "Event found",
+      data: event,
+    });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
 };
 
 const updateEvent = async (req, res) => {
-    try{
-        const eventId = req.params.id
-        const { eventName, date, description, location } = req.body;
+  try {
+    const eventId = req.params.id;
+    const { eventName, date, description, location, registrationDeadline } = req.body;
 
-        // Create an object with only the fields provided
-        const updateFields = {};
-        if (eventName) updateFields.eventName = eventName;
-        if (date) updateFields.date = date;
-        if (description) updateFields.description = description;
-        if (location) updateFields.location = location;
+    const updateFields = {};
+    if (eventName) updateFields.eventName = eventName;
+    if (date) updateFields.date = date;
+    if (description) updateFields.description = description;
+    if (location) updateFields.location = location;
+    if (registrationDeadline) updateFields.registrationDeadline = registrationDeadline;
 
-        // Update the event document
-        const updatedEvent = await events.findByIdAndUpdate(
-            eventId,
-            { $set: updateFields },
-            { new: true } // Return the updated document
-        );
-
-        if (!updatedEvent) {
-            return res.status(404).json({ message: "Event not found" });
-        }
-
-        return res.status(200).json({
-            message: "Event updated successfully",
-            data: updatedEvent
-        });
-
-    }catch(e){
-        res.status(500).json({message: e.message})
+    let updatedEvent = await soloEvents.findByIdAndUpdate(eventId, { $set: updateFields }, { new: true });
+    if (!updatedEvent) {
+      updatedEvent = await teamEvents.findByIdAndUpdate(eventId, { $set: updateFields }, { new: true });
     }
-}
 
-const deleteEvent = async (req, res) => {
-    try {
-        const eventId = req.params.id;
-
-        const deletedEvent = await events.findByIdAndDelete(eventId);
-
-        if (!deletedEvent) {
-            return res.status(404).json({ message: "Event not found" });
-        }
-
-        return res.status(200).json({
-            message: "Event deleted successfully",
-            data: deletedEvent
-        });
-
-    } catch (e) {
-        res.status(500).json({ message: e.message });
+    if (!updatedEvent) {
+      return res.status(404).json({ message: "Event not found" });
     }
+
+    return res.status(200).json({
+      message: "Event updated successfully",
+      data: updatedEvent,
+    });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
-export default {addEvent, getEvents, GetOneEventUsingId, updateEvent, deleteEvent}
+const deleteEvent = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+
+    let deletedEvent = await soloEvents.findByIdAndDelete(eventId);
+    if (!deletedEvent) {
+      deletedEvent = await teamEvents.findByIdAndDelete(eventId);
+    }
+
+    if (!deletedEvent) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    return res.status(200).json({
+      message: "Event deleted successfully",
+      data: deletedEvent,
+    });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+};
+
+const registerForSoloEvent = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const eventId = req.params.id;
+    const { Name } = req.body;
+
+    const event = await soloEvents.findById(eventId);
+    if (!event) return res.status(404).json({ message: "Event not found" });
+
+    if (event.registeredMembers.some((m) => m.userId.toString() === userId)) {
+      return res.status(400).json({ message: "Already registered" });
+    }
+
+    event.registeredMembers.push({ userId, Name, paymentStatus: false });
+    await event.save();
+
+    res.status(200).json({ message: "Registered for event" });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+};
+
+const registerForTeamEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { teamName, members } = req.body; // members = ["email1", "email2", "email3"]
+
+    // Validate input
+    if (!teamName || !Array.isArray(members) || members.length === 0) {
+      return res.status(400).json({ message: "Team name and members are required." });
+    }
+
+    // Check registration deadline
+    //console.log(eventId);
+    const event = await teamEvents.findById(eventId);
+    if (!event) return res.status(404).json({ message: "Event not found." });
+
+    const now = new Date();
+    if (now > event.registrationDeadline) {
+      return res.status(400).json({ message: "Registration deadline has passed." });
+    }
+
+    // Check if team name is already registered
+    const duplicateTeam = await teamEvents.findOne({
+      _id: eventId,
+      "registeredTeams.teamName": teamName
+    });
+
+    if (duplicateTeam) {
+      return res.status(400).json({ message: "Team name already registered for this event." });
+    }
+
+    // Process members
+    const processedMembers = [];
+
+    for (const email of members) {
+      const user = await userModel.findOne({ email: email });
+      if (!user) {
+        return res.status(404).json({ message: `User with email ${email} not found.` });
+      }
+
+      // Check if this user is already part of any team in the event
+      const alreadyInTeam = await teamEvents.findOne({
+        _id: eventId,
+        "registeredTeams.members.userId": user._id
+      });
+
+      if (alreadyInTeam) {
+        return res.status(400).json({ message: `User ${member.email} is already registered in a team.` });
+      }
+
+      processedMembers.push({
+        userId: user._id,
+        Name: user.name || "", // fallback to empty if name not found
+        paymentStatus: member.paymentStatus || false,
+      });
+    }
+
+    // Add new team
+    const newTeam = {
+      teamName,
+      members: processedMembers
+    };
+
+    event.registeredTeams.push(newTeam);
+    await event.save();
+
+    return res.status(200).json({ message: "Team registered successfully." });
+
+  } catch (error) {
+    console.error("Register team error:", error);
+    res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+const uploadImagesToGallery = async (req, res) => {
+  try {
+    const images = req.files;
+    let imagesURL = await Promise.all(
+      images.map(async (item) => {
+        let result = await cloudinary.uploader.upload(item.path, {
+          resource_type: "image",
+          folder: "Gallery",
+        });
+        return {
+          url: result.secure_url,
+          publicId: result.public_id,
+        };
+      })
+    );
+    await eventGallery.create({ images: imagesURL });
+    res.status(200).json({ message: "Image(s) uploaded successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error uploading: " + err });
+  }
+};
+
+export {
+  addEvent,
+  getEvents,
+  GetOneEventUsingId,
+  updateEvent,
+  deleteEvent,
+  registerForSoloEvent,
+  registerForTeamEvent,
+  uploadImagesToGallery,
+};

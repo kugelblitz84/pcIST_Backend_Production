@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema({
 	dept: { type: String },
 	role: { type: Number, required: true, default: 1 },
 	membership: { type: Boolean, default: false },
+	membershipExpiresAt: {type: Date, default: null},
 	cfhandle: { type: String },
 	atchandle: { type: String },
 	cchandle: { type: String },

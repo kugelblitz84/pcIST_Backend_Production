@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import generateOTP from "../utils/generateOTP.js";
 import sendEmail from "../utils/sendEmail.js";
 import slugify from "slugify";
+import agenda from '../configs/agenda.js'
 
 const createToken = ({ id, classroll, email, role }) => {
   return jwt.sign({ id, classroll, email, role }, process.env.JWT_SECRET);
@@ -127,13 +128,11 @@ const login = async (req, res) => {
     const { classroll, password } = req.body;
 
     if (!classroll || !password) {
-      return res
-        .status(400)
-        .json({
-          code: 400,
-          status: false,
-          message: "Please provide classroll and password",
-        });
+      return res.status(400).json({
+        code: 400,
+        status: false,
+        message: "Please provide classroll and password",
+      });
     }
 
     const user = await userModel.findOne({ classroll });
@@ -161,7 +160,7 @@ const login = async (req, res) => {
     // Send the token and user data in the response
     res.status(200).json({
       status: true,
-      message: "Login successfull",
+      message: "Login Successfull",
       token: token,
       slug: user.slug,
     });
@@ -192,13 +191,11 @@ const sendVerificationEmail = async (req, res) => {
     const emailTo = user.email;
     await sendEmail({ emailTo, subject, code, content });
 
-    res
-      .status(200)
-      .json({
-        code: 200,
-        status: true,
-        message: "Verification code sent successfully",
-      });
+    res.status(200).json({
+      code: 200,
+      status: true,
+      message: "Verification code sent successfully",
+    });
   } catch (error) {
     console.log(error);
     res.json({ status: false, message: error.message });
@@ -210,13 +207,11 @@ const verifyUser = async (req, res, next) => {
   const email = req.user.email;
 
   if (!email || !code) {
-    return res
-      .status(400)
-      .json({
-        code: 400,
-        status: false,
-        message: "Please provide email and code",
-      });
+    return res.status(400).json({
+      code: 400,
+      status: false,
+      message: "Please provide email and code",
+    });
   }
 
   try {
@@ -228,13 +223,11 @@ const verifyUser = async (req, res, next) => {
     }
 
     if (user.verificationCode !== code) {
-      return res
-        .status(401)
-        .json({
-          code: 401,
-          status: false,
-          message: "Invalid verification code",
-        });
+      return res.status(401).json({
+        code: 401,
+        status: false,
+        message: "Invalid verification code",
+      });
     }
 
     user.is_email_verified = true;
@@ -282,13 +275,11 @@ const sendForgotPasswordCode = async (req, res) => {
     const emailTo = email;
     await sendEmail({ emailTo, subject, code, content });
 
-    res
-      .status(200)
-      .json({
-        code: 200,
-        status: true,
-        message: "Verification code sent successfully",
-      });
+    res.status(200).json({
+      code: 200,
+      status: true,
+      message: "Verification code sent successfully",
+    });
   } catch (error) {
     res.json({ code: 500, status: false, message: "Internal server error" });
   }
@@ -328,13 +319,11 @@ const recoverPassword = async (req, res) => {
 
     await user.save();
 
-    res
-      .status(200)
-      .json({
-        code: 200,
-        status: true,
-        message: "Password changed successfully",
-      });
+    res.status(200).json({
+      code: 200,
+      status: true,
+      message: "Password changed successfully",
+    });
   } catch (error) {
     res.json({ code: 500, status: false, message: "Internal server error" });
   }
@@ -384,6 +373,77 @@ const updateProfile = async (req, res) => {
   }
 };
 
+const getUserList = async (req, res) => {
+  try {
+    const users = await userModel.find({}, "name role slug email membership membershipExpiresAt");
+
+    res.status(200).json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching users",
+    });
+  }
+};
+
+const updateMembershipStatus = async (req, res) => {
+  try {
+    
+
+    const { id } = req.params;
+    const { membership, durationInMonths } = req.body;
+
+    await agenda.cancel({ name: 'expire membership', 'data.userId': id });  //erasing any previous agenda first.
+    //console.log(membership, typeof membership);
+    // if (typeof membership !== "boolean") {
+    //   return res.status(400).json({ message: "Membership must be a boolean." });
+    // }
+
+    const update = { membership };
+
+    if (membership) {
+      if (![1, 2, 3].includes(durationInMonths)) {
+        return res
+          .status(400)
+          .json({ message: "durationInMonths must be 1, 2, or 3." });
+      }
+
+      const expirationDate = new Date();
+      expirationDate.setMonth(expirationDate.getMonth() + durationInMonths);
+      update.membershipExpiresAt = expirationDate;
+
+      // Schedule the background job
+      await agenda.schedule(expirationDate, "expire membership", {
+        userId: id,
+      });
+    } else {
+      update.membershipExpiresAt = null;
+    }
+
+    const updatedUser = await userModel.findByIdAndUpdate(id, update, {
+      new: true,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    res.status(200).json({
+      message: "Membership updated successfully.",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ message: "Server error while updating membership." });
+  }
+};
+
 export {
   superAdminLogin,
   registerMember,
@@ -394,4 +454,6 @@ export {
   recoverPassword,
   updateProfile,
   getUserData,
+  getUserList,
+  updateMembershipStatus,
 };
