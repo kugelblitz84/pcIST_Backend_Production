@@ -13,10 +13,8 @@ const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 4000;
 
-// configs
+// Connect to database and cloud
 connectDB();
-
-//connectCloudinary();
 
 // middlewares
 app.use(express.json());
