@@ -235,6 +235,37 @@ const registerForTeamEvent = async (req, res) => {
   }
 };
 
+const getRegisteredTeamList = async (req, res) => {
+  try{
+    const {eventId} = req.params.id
+    const event = await teamEvents.findById(eventId)
+    if(!event){
+      return res.status(404).json({message: "Event not found"})
+    }
+    return res.status(200).json({
+      teams : event.registeredTeams
+    })
+    
+  }catch(err){
+    return res.status(500).json({messge: "Internal server error"})
+  }
+}
+
+const getRegisteredMembersList = async (req, res) => {
+  try{
+    const {eventId} = req.params.id
+    const event = await soloEvents.findById(eventId)
+    if(!event){
+      return res.status(404).json({message: "Event not found"})
+    }
+    return res.status(200).json({
+      registeredMembers : event.registeredMembers
+    })
+  }catch(err){
+    res.status(500).json({message: "Internal server error"})
+  }
+}
+
 const uploadImagesToGallery = async (req, res) => {
   try {
     const images = req.files;
@@ -267,5 +298,7 @@ export {
   deleteEvent,
   registerForSoloEvent,
   registerForTeamEvent,
+  getRegisteredTeamList,
+  getRegisteredMembersList,
   uploadImagesToGallery,
 };
