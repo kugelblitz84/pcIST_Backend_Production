@@ -9,7 +9,7 @@ import NotificationRouter from "./routes/notificationsRoutes.js";
 import http from "http";
 import { Server } from "socket.io";
 
-// comment
+// comment 1
 
 const app = express();
 const server = http.createServer(app);
