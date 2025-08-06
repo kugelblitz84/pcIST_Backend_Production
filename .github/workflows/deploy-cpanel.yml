@@ -20,6 +20,6 @@ jobs:
           server: ftp.tripstins.com #${{ secrets.FTP_HOST }}
           username: sadimahmud225@pcist.tripstins.com #${{ secrets.FTP_USERNAME }}
           password: sadimahmud338@gmail # ${{ secrets.FTP_PASSWORD }}
-          server-dir: /pcist.tripstins.com/sadimahmud225/
+          server-dir: /pcist.tripstins.com/
           port: 21
-          protocol: ftps
+          protocol: ftp
