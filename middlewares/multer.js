@@ -100,4 +100,4 @@ const uploadEventImages = multer({
   },
 }).array("images", 30);
 
-export default {uploadEventImages, compressImages};
+export {uploadEventImages, compressImages};
