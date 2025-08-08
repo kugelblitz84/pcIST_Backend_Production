@@ -8,7 +8,7 @@ try {
   const sharpModule = await import("sharp");
   sharp = sharpModule.default;
   sharpAvailable = true;
-  console.log("Sharp image compression is available");
+  //console.log("Sharp image compression is available");
 } catch (error) {
   console.warn(
     "Sharp not available, image compression disabled:",
