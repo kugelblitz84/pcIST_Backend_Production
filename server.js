@@ -6,8 +6,10 @@ import connectDB from "./configs/mongodb.js";
 import userRouter from "./routes/userRoute.js";
 import eventRoutes from "./routes/eventRoutes.js";
 import NotificationRouter from "./routes/notificationsRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js"; 
 import http from "http";
 import { Server } from "socket.io";
+import messagesdModel from "./models/chatModel.js";
 
 // comment 2
 
@@ -26,6 +28,7 @@ app.use(cors());
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/event", eventRoutes);
 app.use("/api/v1/notification", NotificationRouter);
+app.use("/api/v1/chat", chatRoutes);
 
 app.get("/", (req, res) => {
   res.send("API update Working");
@@ -44,11 +47,29 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  socket.on("message", (data) => {
-    console.log(`Message from ${socket.id}: ${data}`);
-    socket.broadcast.emit("message", data);
-  });
+  // Listen for incoming messages
+  socket.on("message", async (dataString) => {
+    //console.log(`Message from ${socket.id}:`, dataString);
+    const data = JSON.parse(dataString);
+    try {
+      // Store message in DB
+      const newMessage = new messagesdModel({
+        senderId: data.senderId,
+        text: data.text,
+        senderName: data.senderName,
+        sentAt: data.sentAt || Date.now(),
+      });
 
+      await newMessage.save();
+
+      console.log("Message saved to DB:", newMessage);
+
+      // Broadcast to other clients
+      socket.broadcast.emit("message", data);
+    } catch (error) {
+      console.error("Error saving message:", error);
+    }
+  });
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.id}`);
   });
