@@ -62,7 +62,7 @@ io.on("connection", (socket) => {
 
       await newMessage.save();
 
-      console.log("Message saved to DB:", newMessage);
+      //console.log("Message saved to DB:", newMessage);
 
       // Broadcast to other clients
       socket.broadcast.emit("message", data);
