@@ -147,23 +147,43 @@ const deleteEvent = async (req, res) => {
   try {
     const eventId = req.params.id;
 
-    let deletedEvent = await soloEvents.findByIdAndDelete(eventId);
-    if (!deletedEvent) {
-      deletedEvent = await teamEvents.findByIdAndDelete(eventId);
+    // Try solo events first
+    let event = await soloEvents.findById(eventId);
+    let eventType = "solo";
+
+    if (!event) {
+      event = await teamEvents.findById(eventId);
+      eventType = "team";
     }
 
-    if (!deletedEvent) {
+    if (!event) {
       return res.status(404).json({ message: "Event not found" });
     }
 
+    // If images exist, delete from Cloudinary
+    if (event.images && event.images.length > 0) {
+      const deletePromises = event.images.map(img =>
+        cloudinary.uploader.destroy(img.publicId)
+      );
+      await Promise.all(deletePromises);
+    }
+
+    // Delete event from DB
+    if (eventType === "solo") {
+      await soloEvents.findByIdAndDelete(eventId);
+    } else {
+      await teamEvents.findByIdAndDelete(eventId);
+    }
+
     return res.status(200).json({
-      message: "Event deleted successfully",
-      data: deletedEvent,
+      message: "Event and its images deleted successfully",
+      data: event,
     });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
 };
+
 
 const registerForSoloEvent = async (req, res) => {
   try {
