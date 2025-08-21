@@ -7,6 +7,9 @@ const registeredMembersSchema = mongoose.Schema(
       requried: true,
       ref: "user",
     },
+    classroll: {
+      type: Number,
+    },
     Name: {
       type: String,
     },
@@ -19,15 +22,13 @@ const registeredMembersSchema = mongoose.Schema(
   }
 );
 
-const registeredTeamSchema = mongoose.Schema(
-  {
-    teamName: {
-      type: String,
-      required: true,
-    },
-    members: [registeredMembersSchema]
-  }
-)
+const registeredTeamSchema = mongoose.Schema({
+  teamName: {
+    type: String,
+    required: true,
+  },
+  members: [registeredMembersSchema],
+});
 
 const soloEventSchema = new mongoose.Schema(
   {
@@ -39,7 +40,7 @@ const soloEventSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
-    registrationDeadline:{
+    registrationDeadline: {
       type: Date,
       required: true,
     },
@@ -68,62 +69,54 @@ const soloEventSchema = new mongoose.Schema(
   }
 );
 
-const teamEventSchema = new mongoose.Schema(
-  {
-    eventName: {
-      type: String,
-      required: true,
-    },
-    date: {
-      type: Date,
-      required: true,
-    },
-    registrationDeadline: {
-      type: Date,
-      required: true,
-    },
-    location: {
-      type: String,
-      //requried: true,
-    },
-    description: {
-      type: String,
-    },
-    images: {
-      type: [{ url: { type: String }, publicId: { type: String } }],
-    },
-    needMembership: {
-      type: Boolean,
-      required: true,
-    },
-    registeredTeams: [registeredTeamSchema],
+const teamEventSchema = new mongoose.Schema({
+  eventName: {
+    type: String,
+    required: true,
+  },
+  date: {
+    type: Date,
+    required: true,
+  },
+  registrationDeadline: {
+    type: Date,
+    required: true,
+  },
+  location: {
+    type: String,
+    //requried: true,
+  },
+  description: {
+    type: String,
+  },
+  images: {
+    type: [{ url: { type: String }, publicId: { type: String } }],
+  },
+  needMembership: {
+    type: Boolean,
+    required: true,
+  },
+  registeredTeams: [registeredTeamSchema],
+});
 
-  }
-)
-
-teamEventSchema.index({"registeredTeams.members.userId": 1});
-teamEventSchema.index({"registeredTeams.teamName": 1});
-const gallerySchema = new mongoose.Schema(
-  {
-    images: [
-      {
-        url: {
-          type: String,
-        },
-        publicId: {
-          type: String,
-        }
-      }
-    ]
-
-  }
-    
-  
-)
+teamEventSchema.index({ "registeredTeams.members.userId": 1 });
+teamEventSchema.index({ "registeredTeams.teamName": 1 });
+const gallerySchema = new mongoose.Schema({
+  images: [
+    {
+      url: {
+        type: String,
+      },
+      publicId: {
+        type: String,
+      },
+    },
+  ],
+});
 const teamEvents = mongoose.model("team-events", teamEventSchema);
 const soloEvents = mongoose.model("solo-events", soloEventSchema);
 const eventGallery = mongoose.model("gallery", gallerySchema);
 
-export {soloEvents, teamEvents, eventGallery};
+export { soloEvents, teamEvents, eventGallery };
 
 //done

@@ -202,7 +202,16 @@ const registerForSoloEvent = async (req, res) => {
       return res.status(400).json({ message: "Already registered" });
     }
 
-    event.registeredMembers.push({ userId, Name, paymentStatus: false });
+    // fetch user for classroll
+    const regUser = await userModel.findById(userId);
+    const classroll = regUser ? regUser.classroll : undefined;
+
+    event.registeredMembers.push({
+      userId,
+      classroll,
+      Name,
+      paymentStatus: false,
+    });
     await event.save();
 
     res.status(200).json({ message: "Registered for event" });
@@ -289,6 +298,7 @@ const registerForTeamEvent = async (req, res) => {
 
       processedMembers.push({
         userId: user._id,
+        classroll: user.classroll,
         Name: user.name || "", // fallback to empty if name not found
         paymentStatus: false,
       });
