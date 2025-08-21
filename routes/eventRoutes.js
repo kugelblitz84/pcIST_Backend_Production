@@ -1,5 +1,5 @@
 import express from "express";
-import {uploadEventImages, compressImages } from "../middlewares/multer.js";
+import { uploadEventImages, compressImages } from "../middlewares/multer.js";
 import {
   addEvent,
   getEvents,
@@ -36,8 +36,8 @@ eventRoutes.post(
 );
 eventRoutes.post("/register_for_solo_event/:id", auth, registerForSoloEvent); //event id in params
 eventRoutes.post("/register_for_team_event/:id", auth, registerForTeamEvent);
-eventRoutes.get("/get_registered_teams", getRegisteredTeamList);
-eventRoutes.get("/get_registered_members", getRegisteredMembersList);
+eventRoutes.get("/get_registered_teams/:id", getRegisteredTeamList);
+eventRoutes.get("/get_registered_members/:id", getRegisteredMembersList);
 export default eventRoutes;
 
 //done
