@@ -85,16 +85,18 @@ const getEvents = async (req, res) => {
 const GetOneEventUsingId = async (req, res) => {
   try {
     const eventID = req.params.id;
-
+    let eventType = "solo";
     let event = await soloEvents.findById(eventID);
     if (!event) {
       event = await teamEvents.findById(eventID);
+      eventType = "team";
       if (!event) {
         return res.status(404).json({ message: "No Event Found" });
       }
     }
 
     return res.status(200).json({
+      eventType: eventType,
       message: "Event found",
       data: event,
     });
@@ -147,43 +149,23 @@ const deleteEvent = async (req, res) => {
   try {
     const eventId = req.params.id;
 
-    // Try solo events first
-    let event = await soloEvents.findById(eventId);
-    let eventType = "solo";
-
-    if (!event) {
-      event = await teamEvents.findById(eventId);
-      eventType = "team";
+    let deletedEvent = await soloEvents.findByIdAndDelete(eventId);
+    if (!deletedEvent) {
+      deletedEvent = await teamEvents.findByIdAndDelete(eventId);
     }
 
-    if (!event) {
+    if (!deletedEvent) {
       return res.status(404).json({ message: "Event not found" });
     }
 
-    // If images exist, delete from Cloudinary
-    if (event.images && event.images.length > 0) {
-      const deletePromises = event.images.map(img =>
-        cloudinary.uploader.destroy(img.publicId)
-      );
-      await Promise.all(deletePromises);
-    }
-
-    // Delete event from DB
-    if (eventType === "solo") {
-      await soloEvents.findByIdAndDelete(eventId);
-    } else {
-      await teamEvents.findByIdAndDelete(eventId);
-    }
-
     return res.status(200).json({
-      message: "Event and its images deleted successfully",
-      data: event,
+      message: "Event deleted successfully",
+      data: deletedEvent,
     });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
 };
-
 
 const registerForSoloEvent = async (req, res) => {
   try {
@@ -220,7 +202,16 @@ const registerForSoloEvent = async (req, res) => {
       return res.status(400).json({ message: "Already registered" });
     }
 
-    event.registeredMembers.push({ userId, Name, paymentStatus: false });
+    // fetch user for classroll
+    const regUser = await userModel.findById(userId);
+    const classroll = regUser ? regUser.classroll : undefined;
+
+    event.registeredMembers.push({
+      userId,
+      classroll,
+      Name,
+      paymentStatus: false,
+    });
     await event.save();
 
     res.status(200).json({ message: "Registered for event" });
@@ -307,6 +298,7 @@ const registerForTeamEvent = async (req, res) => {
 
       processedMembers.push({
         userId: user._id,
+        classroll: user.classroll,
         Name: user.name || "", // fallback to empty if name not found
         paymentStatus: false,
       });
