@@ -100,10 +100,20 @@ const generatePadPDF = async ({
 	</html>
 	`;
 
-	const browser = await puppeteer.launch({
+	const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_BIN || process.env.GOOGLE_CHROME_BIN;
+	const launchOptions = {
 		headless: 'new',
-		args: ['--no-sandbox', '--disable-setuid-sandbox']
-	});
+		args: [
+			'--no-sandbox',
+			'--disable-setuid-sandbox',
+			'--disable-dev-shm-usage',
+			'--disable-gpu',
+			'--no-zygote',
+			'--no-first-run'
+		],
+		...(executablePath ? { executablePath } : {})
+	};
+	const browser = await puppeteer.launch(launchOptions);
 	try {
 		const page = await browser.newPage();
 		await page.setContent(html, { waitUntil: 'networkidle0' });
