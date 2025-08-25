@@ -1,17 +1,14 @@
-import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import PDFDocument from 'pdfkit';
+import sharp from 'sharp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Helpers
 const mm = (n) => (n * 72) / 25.4; // convert millimeters to PDF points
-const readAsset = async (relativePath) => {
-	const absPath = path.resolve(__dirname, '..', relativePath);
-	return fs.readFile(absPath);
-};
+const assetPath = (relativePath) => path.resolve(__dirname, '..', relativePath);
 
 // Generate a professional multi-page PDF for pcIST statements
 const generatePadPDF = async ({
@@ -22,9 +19,13 @@ const generatePadPDF = async ({
 	contactPhone = '',
 	address = 'Institute of Science & Technology (IST), Dhaka',
 }) => {
-	// Read assets as buffers for PDFKit
-	const istLogo = await readAsset('assets/logos/IST_logo.png');
-	const pcistLogo = await readAsset('assets/logos/pcIST_logo.png');
+	// Resolve and normalize logos to standard PNG buffers (PDFKit-friendly)
+	const istLogoPath = assetPath('assets/logos/IST_logo.png');
+	const pcistLogoPath = assetPath('assets/logos/pcIST_logo.png');
+	const [istLogo, pcistLogo] = await Promise.all([
+		sharp(istLogoPath).png({ compressionLevel: 9 }).toBuffer(),
+		sharp(pcistLogoPath).png({ compressionLevel: 9 }).toBuffer(),
+	]);
 
 	const today = new Date();
 	const dateStr = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -51,20 +52,21 @@ const generatePadPDF = async ({
 		const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 		const xLeft = doc.page.margins.left;
 		let y = doc.page.margins.top;
+		const logoYOffset = -16; // move logos further upward
 
 		// Header
 	const logoSize = 70; // points
 	const corner = 12;
-	// Left logo with rounded clip
+	// Left logo with rounded clip (slightly higher)
 	doc.save();
-	doc.roundedRect(xLeft, y, logoSize, logoSize, corner).clip();
-	doc.image(istLogo, xLeft, y, { width: logoSize, height: logoSize });
+	doc.roundedRect(xLeft, y + logoYOffset, logoSize, logoSize, corner).clip();
+	doc.image(istLogo, xLeft, y + logoYOffset, { width: logoSize, height: logoSize });
 	doc.restore();
 	// Right logo with rounded clip
 	const rightLogoX = doc.page.width - doc.page.margins.right - logoSize;
 	doc.save();
-	doc.roundedRect(rightLogoX, y, logoSize, logoSize, corner).clip();
-	doc.image(pcistLogo, rightLogoX, y, { width: logoSize, height: logoSize });
+	doc.roundedRect(rightLogoX, y + logoYOffset, logoSize, logoSize, corner).clip();
+	doc.image(pcistLogo, rightLogoX, y + logoYOffset, { width: logoSize, height: logoSize });
 	doc.restore();
 
 		// Brand title centered
@@ -79,7 +81,7 @@ const generatePadPDF = async ({
 			contactPhone ? `Phone: ${contactPhone}` : null,
 		].filter(Boolean).join(' | ');
 		if (contactLine) {
-			doc.fontSize(11).fillColor('#555').text(contactLine, { width: pageWidth, align: 'center' });
+			doc.fontSize(11).fillColor('#555').text(contactLine, xLeft, doc.y, { width: pageWidth, align: 'center' });
 		}
 
 		// Gradient rule
@@ -98,13 +100,13 @@ const generatePadPDF = async ({
 
 		// Content
 		const contentY = metaY + 16;
-		doc.font('Helvetica').fontSize(14).fillColor('#222');
+		doc.font('Helvetica').fontSize(12.5).fillColor('#222');
 		doc.moveTo(xLeft, contentY);
 		doc.y = contentY;
-		const textOptions = { align: 'justify', lineGap: 6, paragraphGap: 12 }; // approx line-height 1.6
+		const textOptions = { align: 'justify', lineGap: 5, width: pageWidth };
 		paragraphs.forEach((p, idx) => {
-			doc.text(p, { ...textOptions, width: pageWidth });
-			if (idx !== paragraphs.length - 1) doc.moveDown(0.2);
+			doc.text(p, xLeft, doc.y, textOptions);
+			if (idx !== paragraphs.length - 1) doc.moveDown(0.6);
 		});
 
 		// Footer (signature) on each page
@@ -112,7 +114,8 @@ const generatePadPDF = async ({
 			const sigWidth = 260;
 			const sigLineWidth = 220;
 			const xSig = doc.page.width - doc.page.margins.right - sigWidth;
-			const ySig = doc.page.height - doc.page.margins.bottom - 80; // place above bottom margin
+			// Place signature safely within content area near bottom (prevents page spill)
+			const ySig = doc.page.height - doc.page.margins.bottom - 56;
 			doc.save();
 			doc.font('Helvetica').fontSize(12).fillColor('#000');
 			// Signature line
