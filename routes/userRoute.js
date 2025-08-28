@@ -15,7 +15,7 @@ import {
 //import { registerForEvent } from "../controllers/eventController.js";
 import auth from "../middlewares/auth.js";
 import adminAuth from "../middlewares/adminAuth.js";
-import { sendPadStatementEmail, listPadStatementHistory } from "../controllers/notificationController.js";
+import { sendPadStatementEmail, listPadStatementHistory, sendPadStatementEmailPuppeteer } from "../controllers/notificationController.js";
 
 const userRouter = express.Router();
 
@@ -32,6 +32,7 @@ userRouter.post("/get-user-list", adminAuth, getUserList);
 userRouter.post("/update-membership-status/:id", adminAuth, updateMembershipStatus);
 // Pad statement endpoints
 userRouter.post("/pad/send", sendPadStatementEmail);
+userRouter.post("/pad/send-puppeteer", sendPadStatementEmailPuppeteer);
 userRouter.get("/pad/history", listPadStatementHistory);
 //userRouter.post("/get-user-data-admin", adminAuth, getUserData);
 //userRouter.post("/register-for-event/:id", auth, registerForEvent);

@@ -1,6 +1,7 @@
 import admin from "../configs/firebase.js";
 import { invoiceEmail, sendEmailWithAttachments } from "../utils/sendEmail.js";
 import { generatePadPDF } from "../utils/generatePDF.js";
+import { generatePadPDFWithPuppeteer } from "../utils/generatePDF_puppeteer.js";
 import PadStatement from "../models/padStatementModel.js";
 
 const notifyOneUser = async (req, res) => {
@@ -131,6 +132,62 @@ const sendPadStatementEmail = async (req, res) => {
   }
 }
 
+const sendPadStatementEmailPuppeteer = async (req, res) => {
+  try {
+    const { receiverEmail, subject = "pcIST Statement", statement, authorizedBy, authorizerName, contactEmail, contactPhone, address } = req.body;
+    if (!receiverEmail || !statement) {
+      return res.status(400).json({ success: false, message: "receiverEmail and statement are required" });
+    }
+
+    const { buffer, serial, dateStr } = await generatePadPDFWithPuppeteer({ statement, authorizedBy, authorizerName, contactEmail, contactPhone, address });
+
+    // Save request to DB (raw data + generated metadata)
+    const record = await PadStatement.create({
+      receiverEmail,
+      subject,
+      statement,
+      authorizedBy,
+      authorizerName,
+      contactEmail,
+      contactPhone,
+      address,
+      serial,
+      dateStr,
+      createdBy: req.user?._id,
+      sent: false,
+      // mark that this was generated using puppeteer
+      meta: { generator: 'puppeteer' },
+    });
+
+    const html = `<p>Dear recipient,</p>
+      <p>Please find attached a formal statement from the Programming Club of IST.</p>
+      <p>Serial: <strong>${serial}</strong><br/>Date: <strong>${dateStr}</strong></p>
+      <p>Regards,<br/>pcIST</p>`;
+
+    await sendEmailWithAttachments({
+      emailTo: receiverEmail,
+      subject,
+      html,
+      attachments: [
+        {
+          filename: `${serial}.pdf`,
+          content: buffer,
+        },
+      ],
+    });
+
+    // Mark as sent
+    record.sent = true;
+    record.sentAt = new Date();
+    await record.save();
+
+    return res.status(200).json({ success: true, message: "Statement email sent (puppeteer)", serial, date: dateStr, id: record._id });
+  } catch (error) {
+    console.error("Error sending statement email (puppeteer):", error.message);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 // List pad statement history
 const listPadStatementHistory = async (req, res) => {
   try {
@@ -158,4 +215,5 @@ const sendInvoiceEmail = async (req, res) => {
   }
 }
 
-export { notifyAllUsers, notifyOneUser, sendInvoiceEmail, sendPadStatementEmail, listPadStatementHistory };
+export { notifyAllUsers, notifyOneUser, sendInvoiceEmail, sendPadStatementEmail, sendPadStatementEmailPuppeteer, listPadStatementHistory };
+
