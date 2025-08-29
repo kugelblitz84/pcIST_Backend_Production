@@ -50,12 +50,14 @@ const generatePadPDFWithPuppeteer = async ({
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <style>
-      @page { size: A4; margin: 20mm 15mm; }
-      body { font-family: Arial, Helvetica, sans-serif; color: #222; margin: 0; }
-      .header { text-align: center; position: relative; }
-      .logo-left, .logo-right { width: 70px; height: 70px; border-radius: 12px; object-fit: cover; position: absolute; top: -16px; }
-      .logo-left { left: 0; }
-      .logo-right { right: 0; }
+  /* reserve extra bottom space so an absolute-positioned signature won't force a new page */
+  @page { size: A4; margin: 20mm 15mm 30mm 15mm; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #222; margin: 0; }
+  .header { text-align: center; position: relative; padding-top: 5mm; }
+  /* logos slightly inset and fully visible */
+  .logo-left, .logo-right { width: 70px; height: 70px; border-radius: 12px; object-fit: cover; position: absolute; top: 0.5mm; }
+  .logo-left { left: 2mm; }
+  .logo-right { right: 2mm; }
       h1 { margin: 8px 0 2px 0; font-size: 20px; }
       .address { color: #555; font-size: 12px; margin-bottom: 4px; }
       .contact { color: #555; font-size: 11px; margin-bottom: 8px; }
@@ -63,8 +65,9 @@ const generatePadPDFWithPuppeteer = async ({
       .meta { display: flex; justify-content: space-between; font-size: 12px; color: #333; margin-bottom: 12px; }
       .content { font-size: 12.5px; line-height: 1.6; text-align: justify; }
       .content .para { margin: 0 0 10px 0; }
-      .signature { width: 260px; float: right; margin-top: 40px; }
-      .sig-line { width: 220px; height: 1px; background: #0b5ed7; margin-bottom: 6px; }
+  /* signature placed absolutely to bottom-right with safe margins */
+  .signature { width: 260px; position: absolute; right: 15mm; bottom: 12mm; }
+  .sig-line { width: 220px; height: 1px; background: #0b5ed7; margin-bottom: 6px; }
       .sig-name { font-weight: 700; margin-bottom: 6px; }
       .sig-role { margin-bottom: 6px; }
       footer { clear: both; }
@@ -88,7 +91,7 @@ const generatePadPDFWithPuppeteer = async ({
     <div class="content">
       ${paragraphs}
     </div>
-    <div class="signature">
+    <div class="signature" aria-hidden="true">
       <div class="sig-line"></div>
       <div class="sig-name">${authorizedBy || ''}</div>
       <div class="sig-role">${authorizerName || 'General Secretary'}</div>
