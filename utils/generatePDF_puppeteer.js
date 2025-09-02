@@ -11,8 +11,14 @@ const assetPath = (relativePath) => path.resolve(__dirname, '..', relativePath);
 // Returns { buffer, serial, dateStr }
 const generatePadPDFWithPuppeteer = async ({
   statement = '',
+  // legacy single authorizer fields
   authorizedBy = '',
   authorizerName = '',
+  // optional second authorizer legacy fields
+  authorizedBy2 = '',
+  authorizerName2 = '',
+  // new preferred array form: [{ name, role }]
+  authorizers: authorizersParam = undefined,
   contactEmail = '',
   contactPhone = '',
   address = 'Institute of Science & Technology (IST), Dhaka',
@@ -43,6 +49,34 @@ const generatePadPDFWithPuppeteer = async ({
     .filter(Boolean)
     .join(' | ');
 
+  // Build authorizers array (support legacy single/two fields and new array shape)
+  let authorizers = [];
+  if (Array.isArray(authorizersParam) && authorizersParam.length > 0) {
+    authorizers = authorizersParam.slice(0, 2).map((a) => ({ name: a.name || '', role: a.role || a.title || '' }));
+  } else {
+    if (authorizedBy || authorizerName) {
+      authorizers.push({ name: authorizedBy || '', role: authorizerName || '' });
+    }
+    if (authorizedBy2 || authorizerName2) {
+      authorizers.push({ name: authorizedBy2 || '', role: authorizerName2 || '' });
+    }
+  }
+  // Ensure at most 2
+  authorizers = authorizers.slice(0, 2);
+
+  // Signature HTML for up to two authorizers
+  const signatureHtml = (() => {
+    if (authorizers.length === 0) return '';
+    if (authorizers.length === 1) {
+      const a = authorizers[0];
+      return `<div class="signatures"><div class="sig single"><div class="sig-line"></div><div class="sig-name">${a.name || ''}</div><div class="sig-role">${a.role || ''}</div><div>pcIST</div></div></div>`;
+    }
+    // two
+    const left = authorizers[0];
+    const right = authorizers[1];
+    return `<div class="signatures"><div class="sig left"><div class="sig-line"></div><div class="sig-name">${left.name || ''}</div><div class="sig-role">${left.role || ''}</div><div>pcIST</div></div><div class="sig right"><div class="sig-line"></div><div class="sig-name">${right.name || ''}</div><div class="sig-role">${right.role || ''}</div><div>pcIST</div></div></div>`;
+  })();
+
   const html = `
   <!doctype html>
   <html>
@@ -53,26 +87,37 @@ const generatePadPDFWithPuppeteer = async ({
   /* reserve extra bottom space so an absolute-positioned signature won't force a new page */
   @page { size: A4; margin: 20mm 15mm 30mm 15mm; }
   body { font-family: Arial, Helvetica, sans-serif; color: #222; margin: 0; }
-  .header { text-align: center; position: relative; padding-top: 5mm; }
+  .header { text-align: center; position: relative; padding-top: 6mm; }
   /* logos slightly inset and fully visible */
   .logo-left, .logo-right { width: 70px; height: 70px; border-radius: 12px; object-fit: cover; position: absolute; top: 0.5mm; }
-  .logo-left { left: 2mm; }
-  .logo-right { right: 2mm; }
-      h1 { margin: 8px 0 2px 0; font-size: 20px; }
-      .address { color: #555; font-size: 12px; margin-bottom: 4px; }
-      .contact { color: #555; font-size: 11px; margin-bottom: 8px; }
-      .rule { height: 4px; background: linear-gradient(90deg, #0b5ed7 0%, #9ec5fe 100%); margin-bottom: 12px; }
-      .meta { display: flex; justify-content: space-between; font-size: 12px; color: #333; margin-bottom: 12px; }
-      .content { font-size: 12.5px; line-height: 1.6; text-align: justify; }
-      .content .para { margin: 0 0 10px 0; }
-  /* signature placed absolutely to bottom-right with safe margins */
-  .signature { width: 260px; position: absolute; right: 15mm; bottom: 12mm; }
-  .sig-line { width: 220px; height: 1px; background: #0b5ed7; margin-bottom: 6px; }
-      .sig-name { font-weight: 700; margin-bottom: 6px; }
-      .sig-role { margin-bottom: 6px; }
-      footer { clear: both; }
-      /* Ensure content does not overflow; allow page breaks */
-      .page-break { page-break-after: always; }
+  .logo-left { left: 4mm; }
+  .logo-right { right: 4mm; }
+  h1 { margin: 8px 0 2px 0; font-size: 20px; }
+  .address { color: #555; font-size: 12px; margin-bottom: 4px; }
+  .contact { color: #555; font-size: 11px; margin-bottom: 8px; }
+  .rule { height: 4px; background: linear-gradient(90deg, #0b5ed7 0%, #9ec5fe 100%); margin-bottom: 12px; }
+  .meta { display: flex; justify-content: space-between; font-size: 12px; color: #333; margin-bottom: 12px; }
+  .content { font-size: 12.5px; line-height: 1.6; text-align: justify; }
+  .content .para { margin: 0 0 10px 0; }
+
+  /* signatures area (supports 1 or 2 signatories) */
+  .signatures { position: absolute; left: 15mm; right: 15mm; bottom: 12mm; display: flex; justify-content: space-between; align-items: flex-end; }
+  .sig { width: 260px; }
+  .sig.single { margin-left: auto; margin-right: auto; text-align: center; }
+  .sig.left { text-align: left; }
+  .sig.right { text-align: right; }
+  .sig-line { width: 220px; height: 1px; background: #0b5ed7; margin-bottom: 6px; display: block; }
+  .sig-name { font-weight: 700; margin-bottom: 6px; }
+  .sig-role { margin-bottom: 6px; }
+
+  /* corner decorative triangles */
+  .corner { position: fixed; width: 0; height: 0; border-style: solid; z-index: 10; }
+  .corner.tl { left: 0; top: 0; border-width: 0 0 48px 48px; border-color: transparent transparent #0b5ed7 transparent; }
+  .corner.br { right: 0; bottom: 0; border-width: 48px 48px 0 0; border-color: #0b5ed7 transparent transparent transparent; }
+
+  footer { clear: both; }
+  /* Ensure content does not overflow; allow page breaks */
+  .page-break { page-break-after: always; }
     </style>
   </head>
   <body>
@@ -91,12 +136,7 @@ const generatePadPDFWithPuppeteer = async ({
     <div class="content">
       ${paragraphs}
     </div>
-    <div class="signature" aria-hidden="true">
-      <div class="sig-line"></div>
-      <div class="sig-name">${authorizedBy || ''}</div>
-      <div class="sig-role">${authorizerName || 'General Secretary'}</div>
-      <div>pcIST</div>
-    </div>
+  ${signatureHtml}
   </body>
   </html>
   `;
