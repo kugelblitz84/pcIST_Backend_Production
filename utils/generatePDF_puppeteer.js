@@ -12,15 +12,7 @@ const assetPath = (relativePath) => path.resolve(__dirname, '..', relativePath);
 const generatePadPDFWithPuppeteer = async (opts = {}) => {
   const {
     statement = '',
-    authorizedBy = '',
-    authorizerName = '',
-    authorizedBy2 = '',
-    authorizerName2 = '',
-    // optional third legacy fields
-    authorizedBy3 = '',
-    authorizerName3 = '',
-    // new preferred array form: [{ name, role }]
-    authorizers: authorizersParam = undefined,
+    authorizers: authorizersParam = [],
     contactEmail = '',
     contactPhone = '',
     address = 'Institute of Science & Technology (IST), Dhaka',
@@ -61,21 +53,12 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
     .filter(Boolean)
     .join(' | ');
 
+  // Handle authorizers array
   let authorizers = [];
   if (Array.isArray(authorizersParam) && authorizersParam.length > 0) {
     authorizers = authorizersParam
       .slice(0, 3)
       .map((a) => ({ name: a.name || '', role: a.role || a.title || '' }));
-  } else {
-    if (authorizedBy || authorizerName) {
-      authorizers.push({ name: authorizedBy || '', role: authorizerName || '' });
-    }
-    if (authorizedBy2 || authorizerName2) {
-      authorizers.push({ name: authorizedBy2 || '', role: authorizerName2 || '' });
-    }
-    if (authorizedBy3 || authorizerName3) {
-      authorizers.push({ name: authorizedBy3 || '', role: authorizerName3 || '' });
-    }
   }
   authorizers = authorizers.slice(0, 3);
 

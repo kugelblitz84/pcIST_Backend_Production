@@ -65,6 +65,6 @@ const sendEmailWithAttachments = async ({ emailTo, subject, html, attachments = 
   await transporter.sendMail(message);
 };
 
-// Default export kept for legacy imports: acts as "send verification code"
+// Default export for sending verification codes
 export default pinCodeEmail;
 export { invoiceEmail, sendEmailWithAttachments };

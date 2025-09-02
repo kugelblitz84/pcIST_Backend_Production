@@ -5,14 +5,7 @@ const padStatementSchema = new mongoose.Schema(
     receiverEmail: { type: String, required: false },
     subject: { type: String, default: 'pcIST Statement' },
     statement: { type: String, required: true },
-    // Legacy individual authorizer fields (for backward compatibility)
-    authorizedBy: { type: String },
-    authorizerName: { type: String },
-    authorizedBy2: { type: String },
-    authorizerName2: { type: String },
-    authorizedBy3: { type: String },
-    authorizerName3: { type: String },
-    // New array-based authorizers (preferred format)
+    // Array-based authorizers
     authorizers: [{
       name: { type: String, required: true },
       role: { type: String, required: true }

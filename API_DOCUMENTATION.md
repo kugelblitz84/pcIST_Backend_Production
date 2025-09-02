@@ -401,25 +401,6 @@ Form Data: { "images": [File1, File2, ...] }
 }
 ```
 
-**Request Body (Legacy Format - Backward Compatibility):**
-
-```javascript
-{
-  "receiverEmail": "recipient@email.com",
-  "subject": "pcIST — Official Statement",
-  "statement": "Dear Sir/Madam,\n\nWe are pleased to share updates...",
-  "authorizedBy": "Md Sazzad Hossain",
-  "authorizerName": "General Secretary",
-  "authorizedBy2": "Dr. A. K. M. Rahman",
-  "authorizerName2": "Head of Department",
-  "authorizedBy3": "Prof. Jane Smith",
-  "authorizerName3": "Faculty Advisor",
-  "contactEmail": "contact@pcist.org",
-  "contactPhone": "+8801XXXXXXXXX",
-  "address": "Institute of Science & Technology (IST), Dhaka"
-}
-```
-
 **Response:**
 
 ```javascript
@@ -498,8 +479,7 @@ Form Data: { "images": [File1, File2, ...] }
 
 ### Notes on Authorizers
 
-- **Recommended**: Use the `authorizers` array format for new implementations
-- **Legacy Support**: Individual fields (`authorizedBy`, `authorizerName`, etc.) are still supported
+- **Format**: Use the `authorizers` array format with `name` and `role` fields
 - **Maximum**: Up to 3 authorizers are supported
 - **Signature Layout**: 
   - 1 signature: positioned at bottom right

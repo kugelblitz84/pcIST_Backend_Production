@@ -1,5 +1,5 @@
 import admin from "../configs/firebase.js";
-import { invoiceEmail, sendEmailWithAttachments } from "../utils/sendEmail.js";
+import { invoiceEmail, sendEmail } from "../utils/sendEmail.js";
 import { generatePadPDFWithPuppeteer, generateInvoicePDFWithPuppeteer } from "../utils/generatePDF_puppeteer.js";
 import PadStatement from "../models/padStatementModel.js";
 import Invoice from "../models/invoiceModel.js";
@@ -77,15 +77,7 @@ const sendPadStatementEmail = async (req, res) => {
       receiverEmail, 
       subject = "pcIST Statement", 
       statement, 
-      // New array format (preferred)
       authorizers,
-      // Legacy individual fields (for backward compatibility)
-      authorizedBy, 
-      authorizerName, 
-      authorizedBy2, 
-      authorizerName2, 
-      authorizedBy3, 
-      authorizerName3, 
       contactEmail, 
       contactPhone, 
       address 
@@ -101,20 +93,8 @@ const sendPadStatementEmail = async (req, res) => {
       contactEmail,
       contactPhone,
       address,
+      authorizers
     };
-
-    // Use new array format if provided, otherwise fall back to legacy fields
-    if (Array.isArray(authorizers) && authorizers.length > 0) {
-      pdfParams.authorizers = authorizers;
-    } else {
-      // Legacy format support
-      pdfParams.authorizedBy = authorizedBy;
-      pdfParams.authorizerName = authorizerName;
-      pdfParams.authorizedBy2 = authorizedBy2;
-      pdfParams.authorizerName2 = authorizerName2;
-      pdfParams.authorizedBy3 = authorizedBy3;
-      pdfParams.authorizerName3 = authorizerName3;
-    }
 
     // Use Puppeteer-based PDF generator
     const { buffer, serial, dateStr } = await generatePadPDFWithPuppeteer(pdfParams);
@@ -188,15 +168,7 @@ const downloadPadStatementPDF = async (req, res) => {
   try {
     const { 
       statement, 
-      // New array format (preferred)
       authorizers,
-      // Legacy individual fields (for backward compatibility)
-      authorizedBy, 
-      authorizerName, 
-      authorizedBy2, 
-      authorizerName2, 
-      authorizedBy3, 
-      authorizerName3, 
       contactEmail, 
       contactPhone, 
       address 
@@ -212,20 +184,8 @@ const downloadPadStatementPDF = async (req, res) => {
       contactEmail,
       contactPhone,
       address,
+      authorizers
     };
-
-    // Use new array format if provided, otherwise fall back to legacy fields
-    if (Array.isArray(authorizers) && authorizers.length > 0) {
-      pdfParams.authorizers = authorizers;
-    } else {
-      // Legacy format support
-      pdfParams.authorizedBy = authorizedBy;
-      pdfParams.authorizerName = authorizerName;
-      pdfParams.authorizedBy2 = authorizedBy2;
-      pdfParams.authorizerName2 = authorizerName2;
-      pdfParams.authorizedBy3 = authorizedBy3;
-      pdfParams.authorizerName3 = authorizerName3;
-    }
 
     // Generate PDF using Puppeteer
     const { buffer, serial, dateStr } = await generatePadPDFWithPuppeteer(pdfParams);
@@ -477,12 +437,7 @@ const downloadPadStatementById = async (req, res) => {
     // Regenerate the PDF using the stored data
     const { buffer } = await generatePadPDFWithPuppeteer({
       statement: padStatement.statement,
-      authorizedBy: padStatement.authorizedBy,
-      authorizerName: padStatement.authorizerName,
-      authorizedBy2: padStatement.authorizedBy2,
-      authorizerName2: padStatement.authorizerName2,
-      authorizedBy3: padStatement.authorizedBy3,
-      authorizerName3: padStatement.authorizerName3,
+      authorizers: padStatement.authorizers,
       contactEmail: padStatement.contactEmail,
       contactPhone: padStatement.contactPhone,
       address: padStatement.address,
@@ -569,25 +524,9 @@ const listInvoiceHistory = async (req, res) => {
   }
 };
 
-const sendInvoiceEmail_legacy = async (req, res) => {
-  try {
-    const { email, subject = "Invoice", description = {"NULL" : "NULL"} } = req.body;
-    if (!email || !description) {
-      return res.status(400).json({ success: false, message: "email and description are required" });
-    }
-
-    await invoiceEmail({ emailTo: email, subject, description });
-    return res.status(200).json({ success: true, message: "Invoice email sent" });
-  } catch (error) {
-    console.error("Error sending invoice email:", error.message);
-    return res.status(500).json({ success: false, message: error.message });
-  }
-}
-
 export { 
   notifyAllUsers, 
   notifyOneUser, 
-  sendInvoiceEmail_legacy, 
   sendPadStatementEmail, 
   downloadPadStatementPDF,
   downloadPadStatementById, 
