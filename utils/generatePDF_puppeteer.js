@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
 import PadStatement from '../models/padStatementModel.js';
+import Invoice from '../models/invoiceModel.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -408,4 +409,407 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
   }
 };
 
-export { generatePadPDFWithPuppeteer };
+export { generatePadPDFWithPuppeteer, generateInvoicePDFWithPuppeteer };
+
+const generateInvoicePDFWithPuppeteer = async (opts = {}) => {
+  const {
+    products = [], // [{ description, unitPrice, quantity }]
+    authorizerName = '',
+    authorizerDesignation = '',
+    contactEmail = '',
+    contactPhone = '',
+    address = 'Institute of Science & Technology (IST), Dhaka',
+  } = opts;
+
+  // Load logos
+  const pcistLogoPath = assetPath('assets/logos/pcIST_logo.png');
+  const [pcistBuf] = await Promise.all([
+    sharp(pcistLogoPath).png({ compressionLevel: 9 }).toBuffer(),
+  ]);
+  const pcistData = `data:image/png;base64,${pcistBuf.toString('base64')}`;
+
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+  
+  // Generate invoice serial number
+  const currentCount = await Invoice.countDocuments({});
+  const nextNumber = currentCount + 1;
+  const paddedNumber = nextNumber.toString().padStart(4, '0');
+  const serial = `INV-${today.getFullYear()}-${paddedNumber}`;
+
+  // Calculate totals for each product and grand total
+  let grandTotal = 0;
+  const productRows = products.map((product, index) => {
+    const quantity = product.quantity || 1;
+    const unitPrice = parseFloat(product.unitPrice) || 0;
+    const total = quantity * unitPrice;
+    grandTotal += total;
+    
+    return `
+      <tr>
+        <td class="text-center">${index + 1}</td>
+        <td>${product.description || ''}</td>
+        <td class="text-center">${quantity}</td>
+        <td class="text-right">৳${unitPrice.toFixed(2)}</td>
+        <td class="text-right">৳${total.toFixed(2)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+          font-family: 'Times New Roman', serif;
+          line-height: 1.4;
+          color: #333;
+          background: white;
+        }
+        
+        .page {
+          width: 210mm;
+          max-width: 210mm;
+          margin: 0 auto;
+          padding: 15mm 12mm 20mm 12mm;
+          background: white;
+          position: relative;
+        }
+        
+        .header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 25px;
+          padding-bottom: 15px;
+          border-bottom: 2px solid #1e3a8a;
+        }
+        
+        .header-left {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+        }
+        
+        .logo {
+          width: 60px;
+          height: 60px;
+          object-fit: contain;
+        }
+        
+        .org-info h1 {
+          font-size: 24px;
+          font-weight: bold;
+          color: #1e3a8a;
+          margin-bottom: 5px;
+        }
+        
+        .org-info p {
+          font-size: 12px;
+          color: #666;
+          margin: 0;
+        }
+        
+        .header-right {
+          text-align: right;
+        }
+        
+        .invoice-title {
+          font-size: 32px;
+          font-weight: bold;
+          color: #1e3a8a;
+          margin-bottom: 5px;
+        }
+        
+        .invoice-meta {
+          font-size: 14px;
+          color: #666;
+        }
+        
+        .invoice-details {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 30px;
+          gap: 40px;
+        }
+        
+        .invoice-info {
+          flex: 1;
+        }
+        
+        .section-title {
+          font-size: 16px;
+          font-weight: bold;
+          color: #1e3a8a;
+          margin-bottom: 10px;
+          padding-bottom: 5px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .info-item {
+          margin-bottom: 5px;
+          font-size: 14px;
+        }
+        
+        .info-label {
+          font-weight: bold;
+          color: #374151;
+        }
+        
+        .products-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 30px;
+          font-size: 14px;
+        }
+        
+        .products-table th {
+          background-color: #1e3a8a;
+          color: white;
+          padding: 12px 8px;
+          text-align: left;
+          font-weight: bold;
+          border: 1px solid #1e3a8a;
+        }
+        
+        .products-table td {
+          padding: 10px 8px;
+          border: 1px solid #d1d5db;
+          vertical-align: top;
+        }
+        
+        .products-table tr:nth-child(even) {
+          background-color: #f9fafb;
+        }
+        
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        
+        .total-section {
+          margin-left: auto;
+          width: 300px;
+          margin-bottom: 40px;
+        }
+        
+        .total-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 8px 0;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .grand-total {
+          background-color: #1e3a8a;
+          color: white;
+          padding: 12px;
+          font-weight: bold;
+          font-size: 16px;
+        }
+        
+        .signature-section {
+          margin-top: 50px;
+          display: flex;
+          justify-content: flex-end;
+        }
+        
+        .signature-box {
+          text-align: center;
+          min-width: 200px;
+        }
+        
+        .signature-line {
+          border-top: 2px solid #374151;
+          margin-bottom: 8px;
+          margin-top: 60px;
+        }
+        
+        .signature-name {
+          font-weight: bold;
+          font-size: 14px;
+          margin-bottom: 3px;
+        }
+        
+        .signature-designation {
+          font-size: 12px;
+          color: #666;
+        }
+        
+        .footer {
+          margin-top: 30px;
+          text-align: center;
+          font-size: 12px;
+          color: #666;
+          border-top: 1px solid #e5e7eb;
+          padding-top: 10px;
+        }
+        
+        @media print {
+          .page {
+            margin: 0;
+            box-shadow: none;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="page">
+        <div class="header">
+          <div class="header-left">
+            <img src="${pcistData}" alt="pcIST Logo" class="logo">
+            <div class="org-info">
+              <h1>Programming Club of IST</h1>
+              <p>${address}</p>
+              ${contactEmail ? `<p>Email: ${contactEmail}</p>` : ''}
+              ${contactPhone ? `<p>Phone: ${contactPhone}</p>` : ''}
+            </div>
+          </div>
+          <div class="header-right">
+            <div class="invoice-title">INVOICE</div>
+            <div class="invoice-meta">
+              <div><strong>Invoice #:</strong> ${serial}</div>
+              <div><strong>Date:</strong> ${dateStr}</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="invoice-details">
+          <div class="invoice-info">
+            <div class="section-title">Invoice Details</div>
+            <div class="info-item">
+              <span class="info-label">Invoice Number:</span> ${serial}
+            </div>
+            <div class="info-item">
+              <span class="info-label">Issue Date:</span> ${dateStr}
+            </div>
+          </div>
+        </div>
+        
+        <table class="products-table">
+          <thead>
+            <tr>
+              <th style="width: 50px;">S/N</th>
+              <th>Description</th>
+              <th style="width: 80px;">Qty</th>
+              <th style="width: 100px;">Unit Price</th>
+              <th style="width: 100px;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${productRows}
+          </tbody>
+        </table>
+        
+        <div class="total-section">
+          <div class="total-row grand-total">
+            <span>Grand Total:</span>
+            <span>৳${grandTotal.toFixed(2)}</span>
+          </div>
+        </div>
+        
+        ${authorizerName ? `
+        <div class="signature-section">
+          <div class="signature-box">
+            <div class="signature-line"></div>
+            <div class="signature-name">${authorizerName}</div>
+            ${authorizerDesignation ? `<div class="signature-designation">${authorizerDesignation}</div>` : ''}
+          </div>
+        </div>
+        ` : ''}
+        
+        <div class="footer">
+          <p>This is a computer generated invoice from Programming Club of IST</p>
+          <p>Thank you for your business!</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  let browser;
+  try {
+    const puppeteer = await import('puppeteer');
+    browser = await puppeteer.default.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    
+    const page = await browser.newPage();
+    
+    // First pass: render without signature and footer to measure content height
+    const tempHtml = html.replace(
+      /<div class="signature-section">[\s\S]*?<\/div>\s*<div class="footer">[\s\S]*?<\/div>/,
+      ''
+    );
+    
+    await page.setContent(tempHtml, { 
+      waitUntil: 'domcontentloaded',
+      timeout: 10000 
+    });
+    
+    // Measure the actual content height
+    const measurements = await page.evaluate(() => {
+      const pageElement = document.querySelector('.page');
+      if (!pageElement) return { contentHeight: 0, pageHeight: 0 };
+      
+      // Get the actual content height
+      const contentHeight = pageElement.scrollHeight;
+      
+      // Calculate available page height (A4 = 297mm - margins)
+      const pageHeightMm = 297 - 15 - 25; // Top and bottom margins
+      const pageHeightPx = (pageHeightMm * 96) / 25.4; // Convert mm to px
+      
+      return { contentHeight, pageHeightPx };
+    });
+    
+    // Calculate position for signature and footer (ensure they're at the bottom)
+    const signatureSpaceNeeded = 120; // Space needed for signature + footer
+    const minTopPosition = measurements.contentHeight + 30; // Content + some gap
+    const maxTopPosition = measurements.pageHeightPx - signatureSpaceNeeded;
+    const signatureTopPosition = Math.max(minTopPosition, maxTopPosition);
+    
+    // Second pass: create final HTML with positioned signature and footer
+    const finalHtml = html.replace(
+      /<div class="signature-section">[\s\S]*?<\/div>\s*<div class="footer">[\s\S]*?<\/div>/,
+      `<div style="position: absolute; top: ${signatureTopPosition}px; right: 0; width: 100%;">
+          <div class="signature-section" style="margin-top: 0; margin-bottom: 20px;">
+            <div class="signature-box">
+              <div class="signature-line"></div>
+              <div class="signature-name">${authorizerName}</div>
+              <div class="signature-designation">${authorizerDesignation}</div>
+            </div>
+          </div>
+          <div class="footer" style="margin-top: 0; text-align: center;">
+            This is a computer generated invoice and does not require a physical signature.<br/>
+            Invoice ID: ${serial} | Generated on: ${dateStr}
+          </div>
+        </div>`
+    );
+    
+    await page.setContent(finalHtml, { 
+      waitUntil: 'domcontentloaded',
+      timeout: 10000 
+    });
+    
+    const buffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '15mm', bottom: '25mm', left: '12mm', right: '12mm' },
+    });
+    
+    await page.close();
+    await browser.close();
+    
+    return { buffer, serial, dateStr, grandTotal };
+  } catch (err) {
+    if (browser) await browser.close();
+    throw err;
+  }
+};

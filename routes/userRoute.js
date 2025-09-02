@@ -15,7 +15,16 @@ import {
 //import { registerForEvent } from "../controllers/eventController.js";
 import auth from "../middlewares/auth.js";
 import adminAuth from "../middlewares/adminAuth.js";
-import { sendPadStatementEmail, downloadPadStatementPDF, listPadStatementHistory } from "../controllers/notificationController.js";
+import { 
+  sendPadStatementEmail, 
+  downloadPadStatementPDF,
+  downloadPadStatementBySerial, 
+  listPadStatementHistory,
+  sendInvoiceEmail,
+  downloadInvoicePDF,
+  downloadInvoiceBySerial,
+  listInvoiceHistory
+} from "../controllers/notificationController.js";
 
 const userRouter = express.Router();
 
@@ -33,7 +42,14 @@ userRouter.post("/update-membership-status/:id", adminAuth, updateMembershipStat
 // Pad statement endpoints
 userRouter.post("/pad/send", sendPadStatementEmail);
 userRouter.post("/pad/download", downloadPadStatementPDF);
+userRouter.get("/pad/download/:serial", downloadPadStatementBySerial);
 userRouter.get("/pad/history", listPadStatementHistory);
+
+// Invoice endpoints
+userRouter.post("/invoice/send", sendInvoiceEmail);
+userRouter.post("/invoice/download", downloadInvoicePDF);
+userRouter.get("/invoice/download/:serial", downloadInvoiceBySerial);
+userRouter.get("/invoice/history", listInvoiceHistory);
 //userRouter.post("/get-user-data-admin", adminAuth, getUserData);
 //userRouter.post("/register-for-event/:id", auth, registerForEvent);
 

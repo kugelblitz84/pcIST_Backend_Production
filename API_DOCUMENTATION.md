@@ -367,6 +367,148 @@ Form Data: { "images": [File1, File2, ...] }
 
 ---
 
+## PAD Statement System
+
+### 1. Send PAD Statement Email
+
+**Endpoint:** `POST /api/users/pad/send`
+**Authentication:** Optional (user context preferred)
+
+**Request Body (New Array Format - Recommended):**
+
+```javascript
+{
+  "receiverEmail": "recipient@email.com",
+  "subject": "pcIST — Official Statement", // Optional, defaults to "pcIST Statement"
+  "statement": "Dear Sir/Madam,\n\nWe are pleased to share updates on upcoming activities...",
+  "authorizers": [
+    {
+      "name": "Md Sazzad Hossain",
+      "role": "General Secretary"
+    },
+    {
+      "name": "Dr. A. K. M. Rahman", 
+      "role": "Head of Department"
+    },
+    {
+      "name": "Prof. Jane Smith",
+      "role": "Faculty Advisor"
+    }
+  ],
+  "contactEmail": "contact@pcist.org",
+  "contactPhone": "+8801XXXXXXXXX",
+  "address": "Institute of Science & Technology (IST), Dhaka"
+}
+```
+
+**Request Body (Legacy Format - Backward Compatibility):**
+
+```javascript
+{
+  "receiverEmail": "recipient@email.com",
+  "subject": "pcIST — Official Statement",
+  "statement": "Dear Sir/Madam,\n\nWe are pleased to share updates...",
+  "authorizedBy": "Md Sazzad Hossain",
+  "authorizerName": "General Secretary",
+  "authorizedBy2": "Dr. A. K. M. Rahman",
+  "authorizerName2": "Head of Department",
+  "authorizedBy3": "Prof. Jane Smith",
+  "authorizerName3": "Faculty Advisor",
+  "contactEmail": "contact@pcist.org",
+  "contactPhone": "+8801XXXXXXXXX",
+  "address": "Institute of Science & Technology (IST), Dhaka"
+}
+```
+
+**Response:**
+
+```javascript
+{
+  "success": true,
+  "message": "Statement email sent",
+  "serial": "pcIST-2025-0001",
+  "date": "02 September 2025",
+  "id": "64a7b8c9d1e2f3a4b5c6d7e8"
+}
+```
+
+### 2. Download PAD Statement PDF
+
+**Endpoint:** `POST /api/users/pad/download`
+**Authentication:** Optional (user context preferred)
+
+**Request Body (New Array Format - Recommended):**
+
+```javascript
+{
+  "statement": "Dear Sir/Madam,\n\nWe are pleased to share updates on upcoming activities...",
+  "authorizers": [
+    {
+      "name": "Md Sazzad Hossain",
+      "role": "General Secretary"
+    },
+    {
+      "name": "Dr. A. K. M. Rahman", 
+      "role": "Head of Department"
+    }
+  ],
+  "contactEmail": "contact@pcist.org",
+  "contactPhone": "+8801XXXXXXXXX",
+  "address": "Institute of Science & Technology (IST), Dhaka"
+}
+```
+
+**Response:** 
+- Content-Type: `application/pdf`
+- Content-Disposition: `attachment; filename="pcIST-2025-0001.pdf"`
+- Body: PDF file buffer
+
+### 3. List PAD Statement History
+
+**Endpoint:** `GET /api/users/pad/history`
+**Authentication:** Admin Required
+
+**Response:**
+
+```javascript
+{
+  "success": true,
+  "count": 15,
+  "data": [
+    {
+      "_id": "64a7b8c9d1e2f3a4b5c6d7e8",
+      "receiverEmail": "recipient@email.com",
+      "subject": "pcIST Statement",
+      "statement": "Dear Sir/Madam...",
+      "authorizers": [
+        {
+          "name": "Md Sazzad Hossain",
+          "role": "General Secretary"
+        }
+      ],
+      "serial": "pcIST-2025-0001",
+      "dateStr": "02 September 2025",
+      "sent": true,
+      "sentAt": "2025-09-02T10:30:00.000Z",
+      "createdAt": "2025-09-02T10:30:00.000Z"
+    }
+  ]
+}
+```
+
+### Notes on Authorizers
+
+- **Recommended**: Use the `authorizers` array format for new implementations
+- **Legacy Support**: Individual fields (`authorizedBy`, `authorizerName`, etc.) are still supported
+- **Maximum**: Up to 3 authorizers are supported
+- **Signature Layout**: 
+  - 1 signature: positioned at bottom right
+  - 2 signatures: positioned at opposite sides
+  - 3 signatures: two at sides, one in the middle
+- **Serial Numbers**: Auto-incremented 4-digit format (e.g., pcIST-2025-0001)
+
+---
+
 ## Error Handling
 
 ### Standard Error Response Format

@@ -140,3 +140,21 @@ dist
 
 # firebase file
 pcist-f93f7-firebase-adminsdk-fbsvc-3a7d657f82.json
+
+# Test files and development utilities (specific files)
+utils/pdf_test_runner.js
+utils/invoice_test_runner.js
+utils/pdf_test_runner_input.js
+
+# Test files pattern matching
+utils/*test*.js
+
+# Temporary files and test outputs
+tmp/
+*.pdf
+
+# Example and test directories
+examples/
+
+# Test configuration files
+*test*.json

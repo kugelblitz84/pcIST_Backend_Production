@@ -7,7 +7,8 @@
   "scripts": {
   "test": "echo \"Error: no test specified\" && exit 1",
   "server": "nodemon server.js",
-  "pdf:test": "node utils/pdf_test_runner.js"
+  "pdf:test": "node utils/pdf_test_runner.js",
+  "invoice:test": "node utils/invoice_test_runner.js"
   },
   "repository": {
     "type": "git",
