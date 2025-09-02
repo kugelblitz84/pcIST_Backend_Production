@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const padStatementSchema = new mongoose.Schema(
   {
-    receiverEmail: { type: String, required: true },
+    receiverEmail: { type: String, required: false },
     subject: { type: String, default: 'pcIST Statement' },
     statement: { type: String, required: true },
     authorizedBy: { type: String },

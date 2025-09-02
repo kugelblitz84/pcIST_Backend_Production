@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
+import PadStatement from '../models/padStatementModel.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,9 +39,12 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
     month: 'long',
     year: 'numeric',
   });
-  const serial = `pcIST-${today.getFullYear()}-${Math.floor(
-    1000 + Math.random() * 9000
-  )}`;
+  
+  // Get current count from database and generate incremental serial number
+  const currentCount = await PadStatement.countDocuments({});
+  const nextNumber = currentCount + 1;
+  const paddedNumber = nextNumber.toString().padStart(4, '0');
+  const serial = `pcIST-${today.getFullYear()}-${paddedNumber}`;
 
   const paragraphs = String(statement)
     .split(/\n\n+/)
