@@ -16,28 +16,61 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
     contactEmail = '',
     contactPhone = '',
     address = 'Institute of Science & Technology (IST), Dhaka',
+    serial: preGeneratedSerial = null,
+    dateStr: preGeneratedDateStr = null,
   } = opts;
   const istLogoPath = assetPath('assets/logos/IST_logo.png');
   const pcistLogoPath = assetPath('assets/logos/pcIST_logo.png');
+  
+  // Process logos with consistent sizing and compression
   const [istBuf, pcistBuf] = await Promise.all([
-    sharp(istLogoPath).png({ compressionLevel: 9 }).toBuffer(),
-    sharp(pcistLogoPath).png({ compressionLevel: 9 }).toBuffer(),
+    sharp(istLogoPath)
+      .resize(76, 76, { 
+        fit: 'contain', 
+        background: { r: 255, g: 255, b: 255, alpha: 0 } // Transparent background
+      })
+      .png({ 
+        compressionLevel: 6, // More stable compression
+        quality: 90,
+        adaptiveFiltering: false // Consistent filtering
+      })
+      .toBuffer(),
+    sharp(pcistLogoPath)
+      .resize(76, 76, { 
+        fit: 'contain', 
+        background: { r: 255, g: 255, b: 255, alpha: 0 } // Transparent background
+      })
+      .png({ 
+        compressionLevel: 6, // More stable compression
+        quality: 90,
+        adaptiveFiltering: false // Consistent filtering
+      })
+      .toBuffer(),
   ]);
   const istData = `data:image/png;base64,${istBuf.toString('base64')}`;
   const pcistData = `data:image/png;base64,${pcistBuf.toString('base64')}`;
 
-  const today = new Date();
-  const dateStr = today.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
+  // Use pre-generated values if provided, otherwise generate them
+  let serial, dateStr;
   
-  // Get current count from database and generate incremental serial number
-  const currentCount = await PadStatement.countDocuments({});
-  const nextNumber = currentCount + 1;
-  const paddedNumber = nextNumber.toString().padStart(4, '0');
-  const serial = `pcIST-${today.getFullYear()}-${paddedNumber}`;
+  if (preGeneratedSerial && preGeneratedDateStr) {
+    serial = preGeneratedSerial;
+    dateStr = preGeneratedDateStr;
+  } else {
+    // Fallback to original generation logic for backward compatibility
+    const today = new Date();
+    dateStr = today.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+    
+    // Get current count from database and generate incremental serial number
+    const currentCount = await PadStatement.countDocuments({});
+    const nextNumber = currentCount + 1;
+    const paddedNumber = nextNumber.toString().padStart(4, '0');
+    serial = `pcIST-${today.getFullYear()}-${paddedNumber}`;
+  }
 
   const paragraphs = String(statement)
     .split(/\n\n+/)
@@ -121,12 +154,19 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
 <title>pcIST — High Tech Letter</title>
 <style>
   @page { size: A4; margin: 15mm 12mm 20mm 12mm; }
-  html,body{height:100%;margin:0;background:#fff;font-family:"Inter","Segoe UI",Roboto,Arial,sans-serif;color:#1f2937;}
+  html,body{height:100%;margin:0;background:#fff;font-family:"Inter","Segoe UI",Roboto,Arial,sans-serif;color:#1f2937;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
   :root{
     --blue-1:#0d6efd;
     --blue-2:#4dabf7;
     --cyan:#0dcaf0;
     --accent:linear-gradient(135deg,var(--blue-1),var(--blue-2));
+  }
+
+  /* Mobile-optimized styling for consistent PDF rendering */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    box-sizing: border-box;
   }
 
   .page{position:relative;box-sizing:border-box;padding:10mm 18mm 16mm 18mm;overflow:visible;}
@@ -147,7 +187,20 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
   .corner-br-svg svg{width:100%;height:100%;display:block}
 
   header{text-align:center;padding-top:12mm;margin-bottom:2mm;position:relative;z-index:5;}
-  .logo{width:76px;height:76px;object-fit:contain;position:absolute;top:10mm;z-index:6;}
+  .logo{
+    width:76px;
+    height:76px;
+    object-fit:contain;
+    object-position:center;
+    position:absolute;
+    top:10mm;
+    z-index:6;
+    image-rendering:high-quality;
+    image-rendering:-webkit-optimize-contrast;
+    image-rendering:crisp-edges;
+    max-width:76px;
+    max-height:76px;
+  }
   .logo.left{left:8mm;}
   .logo.right{right:8mm;}
   header h1{margin:6px 0 2px;font-size:20px;font-weight:700;position:relative;z-index:6;}
@@ -319,6 +372,17 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
 
   try {
     const page = await browser.newPage();
+    
+    // Set viewport for consistent rendering across devices
+    await page.setViewport({
+      width: 794, // A4 width in pixels at 96 DPI
+      height: 1123, // A4 height in pixels at 96 DPI
+      deviceScaleFactor: 1,
+    });
+    
+    // Optimize page for PDF generation
+    await page.emulateMediaType('print');
+    
     await page.setContent(html, { waitUntil: 'networkidle0' });
 
     // If there are signatures, do a measurement pass to pin them to the bottom of the last page
@@ -382,6 +446,11 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
       format: 'A4',
       printBackground: true,
       margin: { top: '15mm', bottom: '20mm', left: '12mm', right: '12mm' },
+      preferCSSPageSize: true,
+      displayHeaderFooter: false,
+      scale: 1.0, // Consistent scaling across devices
+      width: '210mm', // Explicit A4 width
+      height: '297mm', // Explicit A4 height
     });
     await page.close();
     await browser.close();
@@ -408,7 +477,17 @@ const generateInvoicePDFWithPuppeteer = async (opts = {}) => {
   // Load logos
   const pcistLogoPath = assetPath('assets/logos/pcIST_logo.png');
   const [pcistBuf] = await Promise.all([
-    sharp(pcistLogoPath).png({ compressionLevel: 9 }).toBuffer(),
+    sharp(pcistLogoPath)
+      .resize(60, 60, { 
+        fit: 'contain', 
+        background: { r: 255, g: 255, b: 255, alpha: 0 } // Transparent background
+      })
+      .png({ 
+        compressionLevel: 6, // More stable compression
+        quality: 90,
+        adaptiveFiltering: false // Consistent filtering
+      })
+      .toBuffer(),
   ]);
   const pcistData = `data:image/png;base64,${pcistBuf.toString('base64')}`;
 
@@ -695,6 +774,16 @@ const generateInvoicePDFWithPuppeteer = async (opts = {}) => {
     
     const page = await browser.newPage();
     
+    // Set viewport for consistent rendering across devices
+    await page.setViewport({
+      width: 794, // A4 width in pixels at 96 DPI
+      height: 1123, // A4 height in pixels at 96 DPI
+      deviceScaleFactor: 1,
+    });
+    
+    // Optimize page for PDF generation
+    await page.emulateMediaType('print');
+    
     // First pass: render without signature and footer to measure content height
     const tempHtml = html.replace(
       /<div class="signature-section">[\s\S]*?<\/div>\s*<div class="footer">[\s\S]*?<\/div>/,
@@ -754,6 +843,11 @@ const generateInvoicePDFWithPuppeteer = async (opts = {}) => {
       format: 'A4',
       printBackground: true,
       margin: { top: '15mm', bottom: '25mm', left: '12mm', right: '12mm' },
+      preferCSSPageSize: true,
+      displayHeaderFooter: false,
+      scale: 1.0, // Consistent scaling across devices
+      width: '210mm', // Explicit A4 width
+      height: '297mm', // Explicit A4 height
     });
     
     await page.close();

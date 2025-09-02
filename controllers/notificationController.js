@@ -92,17 +92,32 @@ const sendPadStatementEmail = async (req, res) => {
       return res.status(400).json({ success: false, message: "authorizers must be an array" });
     }
 
-    // Prepare parameters for PDF generation
+    // Generate serial number before PDF generation to ensure consistency
+    const today = new Date();
+    const currentCount = await PadStatement.countDocuments({});
+    const nextNumber = currentCount + 1;
+    const paddedNumber = nextNumber.toString().padStart(4, '0');
+    const serial = `pcIST-${today.getFullYear()}-${paddedNumber}`;
+    
+    const dateStr = today.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    // Prepare parameters for PDF generation with pre-generated serial
     const pdfParams = {
       statement,
       contactEmail,
       contactPhone,
       address,
-      authorizers
+      authorizers,
+      serial,  // Pass the pre-generated serial
+      dateStr  // Pass the pre-generated date
     };
 
     // Use Puppeteer-based PDF generator
-    const { buffer, serial, dateStr } = await generatePadPDFWithPuppeteer(pdfParams);
+    const { buffer } = await generatePadPDFWithPuppeteer(pdfParams);
 
     // Save request to DB (raw data + generated metadata)
     const record = await PadStatement.create({
@@ -182,17 +197,32 @@ const downloadPadStatementPDF = async (req, res) => {
       return res.status(400).json({ success: false, message: "authorizers must be an array" });
     }
 
-    // Prepare parameters for PDF generation
+    // Generate serial number before PDF generation to ensure consistency
+    const today = new Date();
+    const currentCount = await PadStatement.countDocuments({});
+    const nextNumber = currentCount + 1;
+    const paddedNumber = nextNumber.toString().padStart(4, '0');
+    const serial = `pcIST-${today.getFullYear()}-${paddedNumber}`;
+    
+    const dateStr = today.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    // Prepare parameters for PDF generation with pre-generated serial
     const pdfParams = {
       statement,
       contactEmail,
       contactPhone,
       address,
-      authorizers
+      authorizers,
+      serial,  // Pass the pre-generated serial
+      dateStr  // Pass the pre-generated date
     };
 
     // Generate PDF using Puppeteer
-    const { buffer, serial, dateStr } = await generatePadPDFWithPuppeteer(pdfParams);
+    const { buffer } = await generatePadPDFWithPuppeteer(pdfParams);
 
     // Save request to DB for tracking (without email sending)
     const record = await PadStatement.create({
