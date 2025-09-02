@@ -1,5 +1,5 @@
 import admin from "../configs/firebase.js";
-import { invoiceEmail, sendEmail } from "../utils/sendEmail.js";
+import { invoiceEmail, sendEmailWithAttachments } from "../utils/sendEmail.js";
 import { generatePadPDFWithPuppeteer, generateInvoicePDFWithPuppeteer } from "../utils/generatePDF_puppeteer.js";
 import PadStatement from "../models/padStatementModel.js";
 import Invoice from "../models/invoiceModel.js";
@@ -297,7 +297,7 @@ const sendInvoiceEmail = async (req, res) => {
       sentAt: new Date(),
     });
 
-    const html = `<p>Dear Valued Client,</p>
+    const html = `<p>Dear Sir/Madam,</p>
       <p>Please find attached your invoice from the Programming Club of IST.</p>
       <p><strong>Invoice #:</strong> ${serial}<br/>
       <strong>Issue Date:</strong> ${issueDateStr}<br/>
