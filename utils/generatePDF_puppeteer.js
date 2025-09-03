@@ -22,10 +22,10 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
   const istLogoPath = assetPath('assets/logos/IST_logo.png');
   const pcistLogoPath = assetPath('assets/logos/pcIST_logo.png');
   
-  // Process logos with consistent sizing and compression
+  // Process logos with smaller, consistent sizing
   const [istBuf, pcistBuf] = await Promise.all([
     sharp(istLogoPath)
-      .resize(76, 76, { 
+      .resize(56, 56, { // Reduced from 76x76 to 56x56 (about 25% smaller)
         fit: 'contain', 
         background: { r: 255, g: 255, b: 255, alpha: 0 } // Transparent background
       })
@@ -36,7 +36,7 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
       })
       .toBuffer(),
     sharp(pcistLogoPath)
-      .resize(76, 76, { 
+      .resize(56, 56, { // Reduced from 76x76 to 56x56 (about 25% smaller)
         fit: 'contain', 
         background: { r: 255, g: 255, b: 255, alpha: 0 } // Transparent background
       })
@@ -174,11 +174,11 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
   .frame{position:fixed;inset:6px;border-radius:8px;border:1px solid rgba(13,110,253,0.12);
     box-shadow:0 3px 12px rgba(13,110,253,0.03),inset 0 1px 0 rgba(255,255,255,0.12);pointer-events:none;z-index:0;}
 
-  .side-strip{position:fixed;top:0;bottom:0;width:6mm;z-index:0;pointer-events:none;
+  .side-strip{position:fixed;top:0;bottom:0;width:4mm;z-index:0;pointer-events:none; /* Reduced from 6mm to 4mm */
     filter:drop-shadow(0 2px 8px rgba(13,110,253,0.04));}
-  .side-strip.left{left:0;background:linear-gradient(180deg,rgba(13,110,253,0.2),rgba(13,110,253,0.05));}
-  .side-strip.right{right:0;background:linear-gradient(180deg,rgba(13,110,253,0.2),rgba(13,110,253,0.05));}
-  .side-strip svg g{stroke-width:0.6 !important;}
+  .side-strip.left{left:0;background:linear-gradient(180deg,rgba(13,110,253,0.15),rgba(13,110,253,0.03));} /* Reduced opacity */
+  .side-strip.right{right:0;background:linear-gradient(180deg,rgba(13,110,253,0.15),rgba(13,110,253,0.03));} /* Reduced opacity */
+  .side-strip svg g{stroke-width:0.4 !important;} /* Reduced from 0.6 to 0.4 */
 
   /* corner svgs sit behind header content but above the frame; logos will be placed above them */
   .corner-svgs{position:fixed;left:0;top:0;width:210mm;height:297mm;z-index:5;pointer-events:none;}
@@ -188,21 +188,21 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
 
   header{text-align:center;padding-top:12mm;margin-bottom:2mm;position:relative;z-index:5;}
   .logo{
-    width:76px;
-    height:76px;
+    width:56px; /* Reduced from 76px */
+    height:56px; /* Reduced from 76px */
     object-fit:contain;
     object-position:center;
     position:absolute;
-    top:10mm;
+    top:12mm; /* Moved down slightly to maintain balance */
     z-index:6;
     image-rendering:high-quality;
     image-rendering:-webkit-optimize-contrast;
     image-rendering:crisp-edges;
-    max-width:76px;
-    max-height:76px;
+    max-width:56px; /* Reduced from 76px */
+    max-height:56px; /* Reduced from 76px */
   }
-  .logo.left{left:8mm;}
-  .logo.right{right:8mm;}
+  .logo.left{left:10mm;} /* Moved in slightly */
+  .logo.right{right:10mm;} /* Moved in slightly */
   header h1{margin:6px 0 2px;font-size:20px;font-weight:700;position:relative;z-index:6;}
   header .sub{color:#6b7280;font-size:11px;margin-bottom:4px;}
   header .contact{color:#6b7280;font-size:11px;margin-bottom:6px;}
@@ -283,21 +283,21 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
           </filter>
         </defs>
 
-  <!-- Top-left smaller -->
-  <path d="M0 0 L56 0 L0 56 Z" fill="url(#triGrad)" opacity="0.98" filter="url(#soft)"></path>
-  <g transform="translate(6,8) scale(0.75)" stroke="rgba(255,255,255,0.22)" stroke-width="1" fill="none">
-          <path d="M6 12 H48 V28 H60" stroke-linecap="round" stroke-linejoin="round"/>
-          <circle cx="6" cy="12" r="1.6" fill="#fff"/>
+  <!-- Top-left smaller (reduced size and opacity) -->
+  <path d="M0 0 L42 0 L0 42 Z" fill="url(#triGrad)" opacity="0.75" filter="url(#soft)"></path>
+  <g transform="translate(4,6) scale(0.6)" stroke="rgba(255,255,255,0.18)" stroke-width="0.8" fill="none">
+          <path d="M6 12 H36 V24 H48" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="6" cy="12" r="1.4" fill="#fff"/>
         </g>
 
         <!-- Bottom-right mirrored (match top-left size) + circuit details -->
         <g transform="translate(210,297) rotate(180)">
-          <path d="M0 0 L56 0 L0 56 Z" fill="url(#triGrad)" opacity="0.98" filter="url(#soft)"></path>
-          <g transform="translate(8,10) scale(0.75)" stroke="rgba(255,255,255,0.22)" stroke-width="1" fill="none">
-            <path d="M6 12 H48 V28 H60" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="6" cy="12" r="1.6" fill="#fff"/>
-            <path d="M12 36 H40 V48 H54" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="12" cy="36" r="1.6" fill="#fff"/>
+          <path d="M0 0 L42 0 L0 42 Z" fill="url(#triGrad)" opacity="0.75" filter="url(#soft)"></path>
+          <g transform="translate(6,8) scale(0.6)" stroke="rgba(255,255,255,0.18)" stroke-width="0.8" fill="none">
+            <path d="M6 12 H36 V24 H48" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="6" cy="12" r="1.4" fill="#fff"/>
+            <path d="M12 30 H32 V40 H44" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="12" cy="30" r="1.4" fill="#fff"/>
           </g>
         </g>
       </svg>
