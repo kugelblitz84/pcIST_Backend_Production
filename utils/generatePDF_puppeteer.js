@@ -201,8 +201,8 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
     max-width:56px; /* Reduced from 76px */
     max-height:56px; /* Reduced from 76px */
   }
-  .logo.left{left:10mm;} /* Moved in slightly */
-  .logo.right{right:10mm;} /* Moved in slightly */
+  .logo.left{left:6mm;} /* Moved further left to increase spacing */
+  .logo.right{right:6mm;} /* Moved further right to increase spacing */
   header h1{margin:6px 0 2px;font-size:20px;font-weight:700;position:relative;z-index:6;}
   header .sub{color:#6b7280;font-size:11px;margin-bottom:4px;}
   header .contact{color:#6b7280;font-size:11px;margin-bottom:6px;}
