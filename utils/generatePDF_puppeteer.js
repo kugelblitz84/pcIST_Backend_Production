@@ -154,7 +154,7 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
 <title>pcIST — High Tech Letter</title>
 <style>
   @page { size: A4; margin: 15mm 12mm 20mm 12mm; }
-  html,body{height:100%;margin:0;background:#fff;font-family:"Inter","Segoe UI",Roboto,Arial,sans-serif;color:#1f2937;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+  html,body{height:100%;margin:0;background:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif;color:#1f2937;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
   :root{
     --blue-1:#0d6efd;
     --blue-2:#4dabf7;
@@ -358,7 +358,34 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
     throw new Error('Puppeteer is not installed. Run `npm install puppeteer`.');
   }
 
-  const launchArgs = ['--no-sandbox', '--disable-setuid-sandbox'];
+  // Check if running on Heroku or other cloud environments
+  const isHeroku = process.env.DYNO || process.env.NODE_ENV === 'production';
+  
+  const launchArgs = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage', // Overcome limited resource problems
+    '--disable-gpu',
+    '--disable-features=VizDisplayCompositor',
+    '--run-all-compositor-stages-before-draw',
+    '--disable-background-timer-throttling',
+    '--disable-renderer-backgrounding',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-ipc-flooding-protection',
+    '--font-render-hinting=none', // Consistent font rendering
+    '--force-color-profile=srgb', // Consistent color rendering
+    '--disable-font-subpixel-positioning', // More consistent text rendering
+  ];
+  
+  // Add Heroku-specific optimizations
+  if (isHeroku) {
+    launchArgs.push(
+      '--memory-pressure-off',
+      '--max_old_space_size=4096',
+      '--single-process' // Sometimes helps with consistency on Heroku
+    );
+  }
+  
   const execPath =
     process.env.PUPPETEER_EXECUTABLE_PATH ||
     process.env.GOOGLE_CHROME_BIN ||
@@ -368,6 +395,8 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
     headless: true,
     args: launchArgs,
     executablePath: execPath,
+    defaultViewport: null, // Use default viewport
+    ignoreDefaultArgs: ['--disable-extensions'], // Allow better rendering
   });
 
   try {
@@ -383,7 +412,16 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
     // Optimize page for PDF generation
     await page.emulateMediaType('print');
     
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    // Set longer timeout for Heroku
+    const timeout = isHeroku ? 30000 : 10000;
+    
+    await page.setContent(html, { 
+      waitUntil: 'networkidle0',
+      timeout: timeout
+    });
+    
+    // Add extra wait time for fonts and images to load completely
+    await new Promise(resolve => setTimeout(resolve, isHeroku ? 2000 : 1000));
 
     // If there are signatures, do a measurement pass to pin them to the bottom of the last page
     if (signatureHtml && String(signatureHtml).trim()) {
@@ -438,8 +476,9 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
   container.innerHTML = sigHtml;
   pageEl.appendChild(container);
       }, signatureHtml);
-      // allow layout to settle
-      await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));
+      // Allow more time for layout to settle on Heroku
+      const settleTime = isHeroku ? 200 : 50;
+      await page.evaluate((time) => new Promise((r) => setTimeout(r, time)), settleTime);
     }
 
     const buffer = await page.pdf({
@@ -766,10 +805,41 @@ const generateInvoicePDFWithPuppeteer = async (opts = {}) => {
 
   let browser;
   try {
+    // Check if running on Heroku or other cloud environments
+    const isHeroku = process.env.DYNO || process.env.NODE_ENV === 'production';
+    
     const puppeteer = await import('puppeteer');
+    
+    const launchArgs = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-features=VizDisplayCompositor',
+      '--run-all-compositor-stages-before-draw',
+      '--disable-background-timer-throttling',
+      '--disable-renderer-backgrounding',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-ipc-flooding-protection',
+      '--font-render-hinting=none',
+      '--force-color-profile=srgb',
+      '--disable-font-subpixel-positioning',
+    ];
+    
+    // Add Heroku-specific optimizations
+    if (isHeroku) {
+      launchArgs.push(
+        '--memory-pressure-off',
+        '--max_old_space_size=4096',
+        '--single-process'
+      );
+    }
+    
     browser = await puppeteer.default.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: launchArgs,
+      defaultViewport: null,
+      ignoreDefaultArgs: ['--disable-extensions'],
     });
     
     const page = await browser.newPage();
@@ -784,6 +854,9 @@ const generateInvoicePDFWithPuppeteer = async (opts = {}) => {
     // Optimize page for PDF generation
     await page.emulateMediaType('print');
     
+    // Set longer timeout for Heroku
+    const timeout = isHeroku ? 30000 : 10000;
+    
     // First pass: render without signature and footer to measure content height
     const tempHtml = html.replace(
       /<div class="signature-section">[\s\S]*?<\/div>\s*<div class="footer">[\s\S]*?<\/div>/,
@@ -792,8 +865,11 @@ const generateInvoicePDFWithPuppeteer = async (opts = {}) => {
     
     await page.setContent(tempHtml, { 
       waitUntil: 'domcontentloaded',
-      timeout: 10000 
+      timeout: timeout
     });
+    
+    // Add extra wait time for fonts and images to load completely
+    await new Promise(resolve => setTimeout(resolve, isHeroku ? 2000 : 1000));
     
     // Measure the actual content height
     const measurements = await page.evaluate(() => {
@@ -836,8 +912,11 @@ const generateInvoicePDFWithPuppeteer = async (opts = {}) => {
     
     await page.setContent(finalHtml, { 
       waitUntil: 'domcontentloaded',
-      timeout: 10000 
+      timeout: timeout
     });
+    
+    // Add extra wait time for fonts and images to load completely
+    await new Promise(resolve => setTimeout(resolve, isHeroku ? 2000 : 1000));
     
     const buffer = await page.pdf({
       format: 'A4',
