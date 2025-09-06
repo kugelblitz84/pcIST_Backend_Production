@@ -11,7 +11,8 @@ import {
   getRegisteredTeamList,
   getRegisteredMembersList,
   uploadImagesToGallery,
-  fetchGalleryImages
+  fetchGalleryImages,
+  updatePayment
 } from "../controllers/eventController.js";
 import adminAuth from "../middlewares/adminAuth.js";
 import auth from "../middlewares/auth.js";
@@ -40,6 +41,8 @@ eventRoutes.post("/register_for_solo_event/:id", auth, registerForSoloEvent); //
 eventRoutes.post("/register_for_team_event/:id", auth, registerForTeamEvent);
 eventRoutes.get("/get_registered_teams/:id", getRegisteredTeamList);
 eventRoutes.get("/get_registered_members/:id", getRegisteredMembersList);
+// Update payment status of members for an event (solo or team); admin protected
+eventRoutes.post("/update_payment/:id", adminAuth, updatePayment);
 export default eventRoutes;
 
 //done

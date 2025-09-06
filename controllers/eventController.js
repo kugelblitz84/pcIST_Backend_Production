@@ -214,11 +214,14 @@ const registerForSoloEvent = async (req, res) => {
     });
     await event.save();
 
+  // Participation is now recorded only after successful payment (see updatePayment controller)
+
     res.status(200).json({ message: "Registered for event" });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
 };
+
 
 const registerForTeamEvent = async (req, res) => {
   try {
@@ -412,6 +415,96 @@ const fetchGalleryImages = async (req, res) => {
   }
 };
 
+// Update payment status for members (solo or team events)
+// Request: POST /update_payment/:id  { members: ["userId1", "userId2"], paymentStatus?: true|false }
+// Optionally each members entry can be an object: { userId: "...", status: true }
+const updatePayment = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const {members, paymentStatus} = req.body;
+    if(paymentStatus == null){
+      return res.status(400).json({ message: "paymentStatus is required" });
+    }
+    if (!Array.isArray(members) || members.length === 0) {
+      return res.status(400).json({ message: "members array is required" });
+    }
+    let eventType = 'solo';
+    let event = await soloEvents.findById(eventId);
+    if(event == null){
+      event = await teamEvents.findById(eventId);
+      if(event == null){
+        return res.status(404).json({ message: "Event not found" });
+      }
+      eventType = 'team';
+    }
+
+    // Normalize member IDs (strings) and ensure uniqueness
+    const memberIds = [...new Set(members.map(m => m.toString()))];
+
+    if(eventType === 'solo'){
+      // For solo events we expect a single member id, but we'll iterate for safety
+      for(const memberId of memberIds){
+        await soloEvents.updateOne(
+          { _id: eventId, "registeredMembers.userId": memberId },
+          { $set: { "registeredMembers.$.paymentStatus": paymentStatus } }
+        );
+      }
+
+      // After marking payment, add participation entries only if paymentStatus === true
+      if(paymentStatus === true){
+        for(const memberId of memberIds){
+          const user = await userModel.findById(memberId);
+          if(!user) continue;
+          // Migrate / ensure structure
+          if(!user.myParticipations || Array.isArray(user.myParticipations)){
+            user.myParticipations = { solo: [], team: [] };
+          } else {
+            user.myParticipations.solo = user.myParticipations.solo || [];
+            user.myParticipations.team = user.myParticipations.team || [];
+          }
+            const exists = user.myParticipations.solo.some(p => p.eventId && p.eventId.toString() === event._id.toString());
+            if(!exists){
+              user.myParticipations.solo.push({ eventId: event._id, eventName: event.eventName });
+              await user.save();
+            }
+        }
+      }
+      return res.status(200).json({ message: "Payment status updated", eventType, eventId });
+    } else {
+      const result = await teamEvents.updateOne(
+        { _id: eventId },
+        { $set: { "registeredTeams.$[].members.$[member].paymentStatus": paymentStatus } },
+        { arrayFilters: [ { "member.userId": { $in: memberIds } } ] }
+      );
+
+      // Add participation only when paymentStatus true
+      if(paymentStatus === true){
+        for(const memberId of memberIds){
+          const user = await userModel.findById(memberId);
+          if(!user) continue;
+          if(!user.myParticipations || Array.isArray(user.myParticipations)){
+            user.myParticipations = { solo: [], team: [] };
+          } else {
+            user.myParticipations.solo = user.myParticipations.solo || [];
+            user.myParticipations.team = user.myParticipations.team || [];
+          }
+          const exists = user.myParticipations.team.some(p => p.eventId && p.eventId.toString() === event._id.toString());
+          if(!exists){
+            user.myParticipations.team.push({ eventId: event._id, eventName: event.eventName });
+            await user.save();
+          }
+        }
+      }
+
+      const updatedCount = result.modifiedCount || 0;
+      return res.status(200).json({ message: `Payment status updated for event type: ${eventType}, updatedCount: ${updatedCount}, eventId: ${eventId}` });
+    }
+  } catch (err) {
+    console.error('updatePayment error:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 
 export {
   addEvent,
@@ -424,5 +517,6 @@ export {
   getRegisteredTeamList,
   getRegisteredMembersList,
   uploadImagesToGallery,
-  fetchGalleryImages
+  fetchGalleryImages,
+  updatePayment
 };

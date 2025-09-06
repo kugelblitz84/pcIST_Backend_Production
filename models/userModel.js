@@ -25,7 +25,22 @@ const userSchema = new mongoose.Schema({
 	cchandle: { type: String },
 	badges: [{ type: String}],
 	certificates: [{ type: String }],
-	slug: { type: String, unique: true }
+	slug: { type: String, unique: true },
+	// Separate categories for participations
+	myParticipations: {
+		solo: [
+			{
+				eventId: { type: mongoose.Schema.Types.ObjectId, ref: 'solo-events' },
+				eventName: { type: String }
+			}
+		],
+		team: [
+			{
+				eventId: { type: mongoose.Schema.Types.ObjectId, ref: 'team-events' },
+				eventName: { type: String }
+			}
+		]
+	},
 }, {
 	minimize: false,
 	timestamps: true
