@@ -37,13 +37,9 @@ const superAdminLogin = async (req, res) => {
 
 const registerMember = async (req, res) => {
   try {
-  let { classroll, email, password } = req.body;
-  if (typeof classroll === 'string') classroll = parseInt(classroll, 10);
+    const { classroll, email, password } = req.body;
 
     // Check is roll is valid or not
-    if (!Number.isInteger(classroll)) {
-      return res.json({ status: false, message: "Invalid classroll" });
-    }
     const exits = await userModel.findOne({ classroll });
     if (exits) {
       return res.json({
@@ -113,11 +109,7 @@ const registerMember = async (req, res) => {
 
 const getUserData = async (req, res) => {
   try {
-    let { slug } = req.body;
-    if (!slug || typeof slug !== 'string') {
-      return res.status(400).json({ message: "Invalid slug" });
-    }
-    slug = String(slug).trim();
+    const { slug } = req.body;
     const user = await userModel
       .findOne({ slug })
       .select("-password -slug -forgotPasswordCode");
@@ -133,8 +125,7 @@ const getUserData = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-  let { classroll, password } = req.body;
-  if (typeof classroll === 'string') classroll = parseInt(classroll, 10);
+    const { classroll, password } = req.body;
 
     if (!classroll || !password) {
       return res.status(400).json({
@@ -144,9 +135,6 @@ const login = async (req, res) => {
       });
     }
 
-    if (!Number.isInteger(classroll)) {
-      return res.status(400).json({ code: 400, status: false, message: "Invalid classroll" });
-    }
     const user = await userModel.findOne({ classroll });
     if (!user) {
       return res
@@ -259,10 +247,7 @@ const verifyUser = async (req, res, next) => {
 
 // forgot password mail verification
 const sendForgotPasswordCode = async (req, res) => {
-  let { email } = req.body;
-  if (typeof email !== 'string' || !validator.isEmail(email)) {
-    return res.status(400).json({ code: 400, status: false, message: "Please provide valid email" });
-  }
+  const { email } = req.body;
 
   if (!email) {
     return res
@@ -302,10 +287,7 @@ const sendForgotPasswordCode = async (req, res) => {
 
 // recover password function
 const recoverPassword = async (req, res) => {
-  let { email, code, password } = req.body;
-  if (typeof email !== 'string' || !validator.isEmail(email)) {
-    return res.status(400).json({ code: 400, status: false, message: "Please provide valid email" });
-  }
+  const { email, code, password } = req.body;
 
   try {
     const user = await userModel.findOne({ email });

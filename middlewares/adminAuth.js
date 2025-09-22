@@ -12,14 +12,13 @@ const adminAuth = async (req, res, next) => {
         const token = authHeader.split(" ")[1];
 
         // Get slug from body
-        let { slug } = req.body;
-        if (!slug || typeof slug !== 'string') {
+        const { slug } = req.body;
+        if (!slug) {
             return res.status(400).json({ message: "Missing slug." });
         }
-        slug = String(slug).trim();
 
         // Find user by slug
-    const user = await userModel.findOne({ slug });
+        const user = await userModel.findOne({ slug });
         if (!user) {
             return res.status(404).json({ message: "User not found." });
         }
