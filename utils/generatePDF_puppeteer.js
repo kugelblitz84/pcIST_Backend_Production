@@ -10,7 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const assetPath = (relativePath) => path.resolve(__dirname, "..", relativePath);
 
-async function loadLogoBase64(path, size = 56) {
+async function loadLogoBase64(path, size = 48) {
   const buf = await sharp(path)
     .resize(size, size, { fit: "contain" })
     .png()
@@ -83,29 +83,65 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
   const blue = rgb(0.05, 0.45, 0.95);
 
   // Layout measurements for formal letter styling
-  const leftMargin = 45;
-  const rightMargin = 45;
-  const topMargin = 30;
-  const baseBottomPadding = 32;
-  const signatureBottomPadding = 140;
-  const signatureLineHeight = 96;
-  const headerGap = 16;
-  const contentGap = 6;
-  const sliceGap = 28;
+  // Reduced top/bottom margins and slightly smaller header spacing
+  const leftMargin = 40;
+  const rightMargin = 40;
+  const topMargin = 28;//28;
+  const baseBottomPadding = 0; // minimal bottom padding to use more vertical space
+  const signatureBottomPadding = 120;
+  const signatureLineHeight = 90;
+  const headerGap = 6; // minimal gap between meta line and horizontal rule
+  const contentGap = 2; // minimal gap between rule and content
+  // Increase overlap between slices to avoid splitting a text line between pages
+  // ~60pt covers roughly 2 typical text lines, ensuring no partial line at page bottom
+  const sliceGap = 60;
 
-  // Embed the uploaded PDF pages (we'll position with per-page trim offsets)
-  const embeddedPages = await decoratedPdf.embedPdf(uploadedPdfBuffer);
+  // Crop margins from input PDF before embedding
+  // This gives us full control over positioning without double margins
+  const inputTopCrop = 50;    // crop this much from top of input PDF
+  const inputBottomCrop = 40; // crop this much from bottom of input PDF
+  const inputLeftCrop = 35;   // crop from left
+  const inputRightCrop = 35;  // crop from right
+
+  // Load the input PDF to crop it
+  const inputPdf = await PDFDocument.load(uploadedPdfBuffer);
+  const inputPages = inputPdf.getPages();
 
   const authorizers = (authorizersParam || []).slice(0, 3);
+  for (let i = 0; i < inputPages.length; i++) {
+    const inputPage = inputPages[i];
+    const { width: origWidth, height: origHeight } = inputPage.getSize();
+
+    // Calculate cropped dimensions
+    const croppedWidth = origWidth - inputLeftCrop - inputRightCrop;
+    const croppedHeight = origHeight - inputTopCrop - inputBottomCrop;
+
+    // Set crop box on the input page to remove margins
+    inputPage.setCropBox(
+      inputLeftCrop,
+      inputBottomCrop,
+      croppedWidth,
+      croppedHeight
+    );
+  }
+
+  // Save cropped PDF and re-embed
+  const croppedPdfBytes = await inputPdf.save();
+  const embeddedPages = await decoratedPdf.embedPdf(croppedPdfBytes);
+
   for (let i = 0; i < embeddedPages.length; i++) {
     const embeddedPage = embeddedPages[i];
     const originalDims = embeddedPage.scale(1);
-    const { width, height } = originalDims;
+    // Use A4 dimensions for output page
+    const width = 595.28;  // A4 width in points
+    const height = 841.89; // A4 height in points
 
     const maxContentWidth = width - leftMargin - rightMargin;
+    // Scale cropped content to fit our content area width
     const baseWidthScale = maxContentWidth / originalDims.width;
-    const zoomMultiplier = 1.12;
-    const maxZoomMultiplier = 1.28;
+    // Zoom slightly to fill vertical space better
+    const zoomMultiplier = 1.15;
+    const maxZoomMultiplier = 1.5;
 
     let scale = Math.min(baseWidthScale * zoomMultiplier, baseWidthScale * maxZoomMultiplier);
     let finalScaledWidth = originalDims.width * scale;
@@ -118,7 +154,9 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
       const page = decoratedPdf.addPage([width, height]);
 
       // Pre-compute header layout so we can clip embedded content before drawing overlays
-      const logoSize = 65;
+      // Smaller logos to avoid clipping header/meta when rendering from website
+      const logoSize = 48;
+      // position logos lower so they align with header text (not clipping date/serial)
       const logoY = height - topMargin - logoSize;
 
       const title = "Programming Club of IST (pcIST)";
@@ -134,22 +172,22 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
       const metaSize = 10;
 
       let headerCursor = titleY;
-      const subY = headerCursor - subSize - 6;
+      const subY = headerCursor - subSize - 4;
       headerCursor = subY;
 
       let contactY = null;
       let contactWidth = 0;
       if (contactLine) {
-        headerCursor -= contactSize + 6;
+        headerCursor -= contactSize + 4;
         contactY = headerCursor;
         contactWidth = font.widthOfTextAtSize(contactLine, contactSize);
       }
 
-      headerCursor -= addressSize + 6;
+      headerCursor -= addressSize + 4;
       const addressY = headerCursor;
       const addressWidth = font.widthOfTextAtSize(address, addressSize);
 
-      headerCursor -= metaSize + 10;
+      headerCursor -= metaSize + 6;
       const metaY = headerCursor;
       const lineY = metaY - headerGap;
       const contentTop = lineY - contentGap;
@@ -175,14 +213,22 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
         contentAreaHeight = Math.max(10, contentTop - bottomPadding);
       }
 
-      const sliceHeight = Math.min(contentAreaHeight, remainingHeight);
+      // Compute slice height; enforce a minimum so we never show only a tiny sliver (partial line)
+      const minSliceHeight = 40; // ~1.5 typical text lines; prevents partial-line exposure
+      let sliceHeight = Math.min(contentAreaHeight, remainingHeight);
       if (sliceHeight <= 0) {
         // Unable to place content safely; break to avoid infinite loop.
         break;
       }
+      // If the remaining is very small but non-final, push it entirely to the next page
+      if (!isLastSliceCandidate && sliceHeight < minSliceHeight) {
+        // Skip drawing this tiny slice; loop will terminate as shownHeight won't advance
+        break;
+      }
 
-      const horizontalExcess = Math.max(0, finalScaledWidth - maxContentWidth);
-      const drawX = leftMargin - horizontalExcess / 2;
+      // Center the embedded PDF within the content area (between left and right margins)
+      // This ensures consistent side margins on all pages
+      const drawX = (width - finalScaledWidth) / 2;
 
       const drawY = contentTop - finalScaledHeight + shownHeight;
   const sliceBottom = contentTop - sliceHeight;
@@ -262,13 +308,13 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
         });
       }
 
-      page.drawText(address, {
-        x: (width - addressWidth) / 2,
-        y: addressY,
-        size: addressSize,
-        font,
-        color: rgb(0.3, 0.3, 0.3),
-      });
+      // page.drawText(address, {
+      //   x: (width - addressWidth) / 2,
+      //   y: addressY,
+      //   size: addressSize,
+      //   font,
+      //   color: rgb(0.3, 0.3, 0.3),
+      // });
 
       page.drawText(`Date: ${dateStr}`, {
         x: leftMargin,
@@ -305,8 +351,12 @@ const generatePadPDFWithPuppeteer = async (opts = {}) => {
         borderColor: blue,
       });
 
-      const advanceBy = Math.max(0, sliceHeight - skipGap);
+      // Advance by the slice height, but if this is the last slice, advance by remaining to exit loop
+      const advanceBy = isLastSliceCandidate ? remainingHeight : Math.max(0, sliceHeight - skipGap);
       shownHeight = Math.min(finalScaledHeight, shownHeight + advanceBy);
+      
+      // Safety: if we didn't advance, break to avoid infinite loop
+      if (advanceBy <= 0) break;
     }
   }
 
