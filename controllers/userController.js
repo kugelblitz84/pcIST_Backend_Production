@@ -110,11 +110,19 @@ const registerMember = async (req, res) => {
 const getUserData = async (req, res) => {
   try {
     const { slug } = req.body;
-    const user = await userModel
+    const requestingUser = req.user;
+    let user;
+    if(requestingUser.slug !== slug && requestingUser.role !== 2){
+      user = await userModel
       .findOne({ slug })
-      .select("-password -slug -forgotPasswordCode");
+      .select("name role title cfhandle atchandle cchandle batch dept badges certificates");
+    }else{
+      user = await userModel.findOne({ slug }).select("-password -forgotPasswordCode -verificationCode ");
+    }
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res
+        .status(404)
+        .json({ status: false, message: "User not found" });
     }
     return res.status(200).json(user);
   } catch (err) {
@@ -375,7 +383,7 @@ const updateProfile = async (req, res) => {
 
 const getUserList = async (req, res) => {
   try {
-    const users = await userModel.find({}, "name role title treasurer slug email membership membershipExpiresAt");
+    const users = await userModel.find({}, "-password -forgotPasswordCode -verificationCode ");
 
     res.status(200).json({
       success: true,

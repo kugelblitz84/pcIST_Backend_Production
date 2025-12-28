@@ -231,13 +231,99 @@ Content-Type: application/json
 
 ---
 
-### 4. Get User List (Updated)
+### 4. Get User Data (Updated)
+
+**Endpoint:** `POST /api/user/get-user-data`
+
+**Authentication:** Required (any authenticated user)
+
+**Description:** Retrieve user data by slug. Returns different data based on who is requesting:
+
+- **Self or Admin**: Returns full user data (excluding sensitive fields like password)
+- **Other Users**: Returns limited public profile data only
+
+**Request:**
+```http
+POST /api/user/get-user-data
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "slug": "12345"
+}
+```
+
+**Parameters:**
+| Parameter | Type | Location | Required | Description |
+|-----------|------|----------|----------|-------------|
+| `slug` | String | Body | Yes | Target user's slug |
+
+**Response (Success - 200, Self or Admin view):**
+```json
+{
+  "_id": "507f1f77bcf86cd799439011",
+  "classroll": 12345,
+  "email": "john@gmail.com",
+  "is_email_verified": true,
+  "phone": "01700000000",
+  "profileimage": "https://...",
+  "name": "John Doe",
+  "gender": "Male",
+  "tshirt": "L",
+  "batch": 2022,
+  "dept": "CSE",
+  "role": 2,
+  "title": "GS",
+  "treasurer": false,
+  "membership": true,
+  "membershipExpiresAt": "2025-03-28T00:00:00.000Z",
+  "cfhandle": "john_cf",
+  "atchandle": "john_at",
+  "cchandle": "john_cc",
+  "badges": ["badge1"],
+  "certificates": ["cert1"],
+  "myParticipations": { "solo": [], "team": [] },
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2025-01-01T00:00:00.000Z"
+}
+```
+
+**Response (Success - 200, Other users view - Limited data):**
+```json
+{
+  "name": "John Doe",
+  "role": 2,
+  "title": "GS",
+  "cfhandle": "john_cf",
+  "atchandle": "john_at",
+  "cchandle": "john_cc",
+  "batch": 2022,
+  "dept": "CSE",
+  "badges": ["badge1"],
+  "certificates": ["cert1"]
+}
+```
+
+---
+
+### 5. Get User List (Updated)
 
 **Endpoint:** `POST /api/user/get-user-list`
 
 **Authentication:** Admin only
 
-**Description:** Retrieve list of all users. Now includes `title` and `treasurer` fields.
+**Description:** Retrieve list of all users with full details. Returns all user fields except sensitive data (password, forgotPasswordCode, verificationCode).
+
+**Request:**
+```http
+POST /api/user/get-user-list
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "slug": "admin-slug"
+}
+```
 
 **Response (Success - 200):**
 ```json
@@ -246,25 +332,30 @@ Content-Type: application/json
   "data": [
     {
       "_id": "507f1f77bcf86cd799439011",
+      "classroll": 12345,
+      "email": "john@gmail.com",
+      "is_email_verified": true,
+      "phone": "01700000000",
+      "profileimage": "https://...",
       "name": "John Doe",
+      "gender": "Male",
+      "tshirt": "L",
+      "batch": 2022,
+      "dept": "CSE",
       "role": 2,
       "title": "GS",
       "treasurer": false,
-      "slug": "12345",
-      "email": "john@gmail.com",
       "membership": true,
-      "membershipExpiresAt": "2025-03-28T00:00:00.000Z"
-    },
-    {
-      "_id": "507f1f77bcf86cd799439012",
-      "name": "Jane Smith",
-      "role": 1,
-      "title": "Member",
-      "treasurer": true,
-      "slug": "12346",
-      "email": "jane@gmail.com",
-      "membership": false,
-      "membershipExpiresAt": null
+      "membershipExpiresAt": "2025-03-28T00:00:00.000Z",
+      "cfhandle": "john_cf",
+      "atchandle": "john_at",
+      "cchandle": "john_cc",
+      "badges": [],
+      "certificates": [],
+      "slug": "12345",
+      "myParticipations": { "solo": [], "team": [] },
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
     }
   ]
 }
@@ -575,7 +666,8 @@ const migrateUsers = async () => {
 | PUT | `/api/user/update-title/:id` | Admin | Update user's title |
 | PUT | `/api/user/toggle-admin/:id` | Admin | Toggle admin status |
 | PUT | `/api/user/toggle-treasurer/:id` | Admin | Toggle treasurer status |
-| POST | `/api/user/get-user-list` | Admin | Get all users (includes title/treasurer) |
+| POST | `/api/user/get-user-data` | Any User | Get user data (returns limited data for non-self/non-admin) |
+| POST | `/api/user/get-user-list` | Admin | Get all users (full details) |
 | POST | `/api/user/invoice/send` | Admin/Treasurer | Send invoice email |
 | POST | `/api/user/invoice/download` | Admin/Treasurer | Download invoice PDF |
 | GET | `/api/user/invoice/download/:id` | Admin/Treasurer | Download invoice by ID |

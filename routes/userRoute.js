@@ -94,6 +94,7 @@ userRouter.put(
 userRouter.post(
   "/get-user-data",
   validateRequest({ body: userSchemas.getUserData }),
+  auth,
   getUserData
 );
 userRouter.post(
