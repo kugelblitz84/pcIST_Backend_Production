@@ -375,7 +375,7 @@ const updateProfile = async (req, res) => {
 
 const getUserList = async (req, res) => {
   try {
-    const users = await userModel.find({}, "name role slug email membership membershipExpiresAt");
+    const users = await userModel.find({}, "name role title treasurer slug email membership membershipExpiresAt");
 
     res.status(200).json({
       success: true,
@@ -444,6 +444,165 @@ const updateMembershipStatus = async (req, res) => {
   }
 };
 
+/**
+ * Update user title (GS, JS, OS, Member)
+ * - Only admins can update titles
+ * - There can only be ONE user with title 'GS' (General Secretary)
+ * - If assigning GS to a user, any existing GS will be demoted to Member
+ */
+const updateUserTitle = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+
+    const validTitles = ['GS', 'JS', 'OS', 'Member'];
+    if (!validTitles.includes(title)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid title. Must be one of: GS, JS, OS, Member",
+      });
+    }
+
+    // Find the target user
+    const targetUser = await userModel.findById(id);
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // If assigning GS title, check for existing GS and demote them
+    if (title === 'GS') {
+      const existingGS = await userModel.findOne({ title: 'GS', _id: { $ne: id } });
+      if (existingGS) {
+        // Demote existing GS to Member
+        existingGS.title = 'Member';
+        await existingGS.save();
+      }
+    }
+
+    targetUser.title = title;
+    await targetUser.save();
+
+    res.status(200).json({
+      success: true,
+      message: `User title updated to ${title} successfully.`,
+      user: {
+        _id: targetUser._id,
+        name: targetUser.name,
+        email: targetUser.email,
+        slug: targetUser.slug,
+        title: targetUser.title,
+        role: targetUser.role,
+        treasurer: targetUser.treasurer,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating user title:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while updating user title.",
+    });
+  }
+};
+
+/**
+ * Toggle admin status of a user
+ * - Only admins can toggle other users' admin status
+ * - Admin cannot demote themselves
+ * - role: 1 = member, 2 = admin
+ */
+const toggleAdminStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isAdmin } = req.body;
+    const requestingUser = req.user;
+
+    // Prevent admin from demoting themselves
+    if (requestingUser._id.toString() === id && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot demote yourself from admin.",
+      });
+    }
+
+    const targetUser = await userModel.findById(id);
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    targetUser.role = isAdmin ? 2 : 1;
+    await targetUser.save();
+
+    res.status(200).json({
+      success: true,
+      message: `User ${isAdmin ? 'promoted to admin' : 'demoted from admin'} successfully.`,
+      user: {
+        _id: targetUser._id,
+        name: targetUser.name,
+        email: targetUser.email,
+        slug: targetUser.slug,
+        title: targetUser.title,
+        role: targetUser.role,
+        treasurer: targetUser.treasurer,
+      },
+    });
+  } catch (error) {
+    console.error("Error toggling admin status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while updating admin status.",
+    });
+  }
+};
+
+/**
+ * Toggle treasurer status of a user
+ * - Only admins can toggle treasurer status
+ * - Treasurer can generate invoices even without admin role
+ */
+const toggleTreasurerStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isTreasurer } = req.body;
+
+    const targetUser = await userModel.findById(id);
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    targetUser.treasurer = isTreasurer;
+    await targetUser.save();
+
+    res.status(200).json({
+      success: true,
+      message: `User treasurer status ${isTreasurer ? 'enabled' : 'disabled'} successfully.`,
+      user: {
+        _id: targetUser._id,
+        name: targetUser.name,
+        email: targetUser.email,
+        slug: targetUser.slug,
+        title: targetUser.title,
+        role: targetUser.role,
+        treasurer: targetUser.treasurer,
+      },
+    });
+  } catch (error) {
+    console.error("Error toggling treasurer status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while updating treasurer status.",
+    });
+  }
+};
+
 export {
   superAdminLogin,
   registerMember,
@@ -456,4 +615,7 @@ export {
   getUserData,
   getUserList,
   updateMembershipStatus,
+  updateUserTitle,
+  toggleAdminStatus,
+  toggleTreasurerStatus,
 };

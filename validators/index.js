@@ -325,6 +325,26 @@ export const userSchemas = {
         });
       }
     }),
+  updateTitle: z
+    .object({
+      slug: slugSchema,
+      title: z.enum(['GS', 'JS', 'OS', 'Member'], {
+        errorMap: () => ({ message: "title must be one of: GS, JS, OS, Member" }),
+      }),
+    })
+    .strict(),
+  toggleAdmin: z
+    .object({
+      slug: slugSchema,
+      isAdmin: booleanSchema,
+    })
+    .strict(),
+  toggleTreasurer: z
+    .object({
+      slug: slugSchema,
+      isTreasurer: booleanSchema,
+    })
+    .strict(),
 };
 
 export const padSchemas = {

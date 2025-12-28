@@ -2,6 +2,8 @@ import mongoose from 'mongoose'
 
 
 // role : 1 - member, 2 - admin
+// title: GS (General Secretary), JS (Joint Secretary), OS (Organizing Secretary), Member
+// treasurer: if true, user can generate invoices
 
 const userSchema = new mongoose.Schema({
 	classroll: { type: Number, required: true, unique: true },
@@ -18,6 +20,12 @@ const userSchema = new mongoose.Schema({
 	batch: { type: Number },
 	dept: { type: String },
 	role: { type: Number, required: true, default: 1 },
+	title: { 
+		type: String, 
+		enum: ['GS', 'JS', 'OS', 'Member'], 
+		default: 'Member' 
+	},
+	treasurer: { type: Boolean, default: false },
 	membership: { type: Boolean, default: false },
 	membershipExpiresAt: {type: Date, default: null},
 	cfhandle: { type: String },

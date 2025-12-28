@@ -11,9 +11,13 @@ import {
   getUserData,
   getUserList,
   updateMembershipStatus,
+  updateUserTitle,
+  toggleAdminStatus,
+  toggleTreasurerStatus,
 } from "../controllers/userController.js";
 import auth from "../middlewares/auth.js";
 import adminAuth from "../middlewares/adminAuth.js";
+import treasurerAuth from "../middlewares/treasurerAuth.js";
 import {
   sendPadStatementEmail,
   downloadPadStatementPDF,
@@ -107,6 +111,36 @@ userRouter.post(
   adminAuth,
   updateMembershipStatus
 );
+
+// User role and title management routes (Admin only)
+userRouter.put(
+  "/update-title/:id",
+  validateRequest({
+    params: commonSchemas.objectIdParam,
+    body: userSchemas.updateTitle,
+  }),
+  adminAuth,
+  updateUserTitle
+);
+userRouter.put(
+  "/toggle-admin/:id",
+  validateRequest({
+    params: commonSchemas.objectIdParam,
+    body: userSchemas.toggleAdmin,
+  }),
+  adminAuth,
+  toggleAdminStatus
+);
+userRouter.put(
+  "/toggle-treasurer/:id",
+  validateRequest({
+    params: commonSchemas.objectIdParam,
+    body: userSchemas.toggleTreasurer,
+  }),
+  adminAuth,
+  toggleTreasurerStatus
+);
+
 // Pad statement endpoints
 userRouter.post(
   "/pad/send",
@@ -129,25 +163,25 @@ userRouter.get(
 );
 userRouter.get("/pad/history", adminAuth, listPadStatementHistory);
 
-// Invoice endpoints
+// Invoice endpoints (Admins and Treasurers can access)
 userRouter.post(
   "/invoice/send",
   validateRequest({ body: invoiceSchemas.send }),
-  adminAuth,
+  treasurerAuth,
   sendInvoiceEmail
 );
 userRouter.post(
   "/invoice/download",
   validateRequest({ body: invoiceSchemas.download }),
-  adminAuth,
+  treasurerAuth,
   downloadInvoicePDF
 );
 userRouter.get(
   "/invoice/download/:id",
   validateRequest({ params: commonSchemas.objectIdParam }),
-  adminAuth,
+  treasurerAuth,
   downloadInvoiceById
 );
-userRouter.get("/invoice/history", adminAuth, listInvoiceHistory);
+userRouter.get("/invoice/history", treasurerAuth, listInvoiceHistory);
 
 export default userRouter;

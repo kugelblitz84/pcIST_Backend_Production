@@ -285,6 +285,10 @@ const listPadStatementHistory = async (req, res) => {
 
 const downloadPadStatementPDF = async (req, res) => {
   try {
+    console.log("[PAD][downloadPadStatementPDF] start", {
+      hasFile: !!req.file,
+      bodyKeys: Object.keys(req.body || {}),
+    });
     const uploadedFile = req.file;
     if (!uploadedFile) {
       return res.status(400).json({ success: false, message: "statementPdf file is required" });
@@ -384,8 +388,14 @@ const downloadPadStatementPDF = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${serial}.pdf"`);
     res.setHeader('Content-Length', buffer.length);
 
+    console.log("[PAD][downloadPadStatementPDF] success", { serial });
     return res.send(buffer);
   } catch (error) {
+    console.error("[PAD][downloadPadStatementPDF] error", {
+      message: error.message,
+      stack: error.stack,
+      hasFile: !!req.file,
+    });
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -496,6 +506,10 @@ const sendInvoiceEmail = async (req, res) => {
 
 const downloadInvoicePDF = async (req, res) => {
   try {
+    console.log("[INV][downloadInvoicePDF] start", {
+      hasBody: !!req.body,
+      productCount: Array.isArray(req.body?.products) ? req.body.products.length : 0,
+    });
     const { 
       products = [], 
       authorizerName = '', 
@@ -568,14 +582,21 @@ const downloadInvoicePDF = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${serial}.pdf"`);
     res.setHeader('Content-Length', buffer.length);
 
+    console.log("[INV][downloadInvoicePDF] success", { serial, invoiceId: invoice._id?.toString() });
     return res.send(buffer);
   } catch (error) {
+    console.error("[INV][downloadInvoicePDF] error", {
+      message: error.message,
+      stack: error.stack,
+      bodyKeys: Object.keys(req.body || {}),
+    });
     return res.status(500).json({ success: false, message: error.message });
   }
 };
 
 const downloadPadStatementById = async (req, res) => {
   try {
+    console.log("[PAD][downloadPadStatementById] start", { params: req.params });
     const { id } = req.params;
 
     if (!id) {
@@ -678,14 +699,21 @@ const downloadPadStatementById = async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="${downloadFileName}"`);
     res.setHeader("Content-Length", contentLength || buffer.length);
 
+    console.log("[PAD][downloadPadStatementById] success", { id: padStatement._id?.toString() });
     return res.send(buffer);
   } catch (error) {
+    console.error("[PAD][downloadPadStatementById] error", {
+      message: error.message,
+      stack: error.stack,
+      params: req.params,
+    });
     return res.status(500).json({ success: false, message: error.message });
   }
 };
 
 const downloadInvoiceById = async (req, res) => {
   try {
+    console.log("[INV][downloadInvoiceById] start", { params: req.params });
     const { id } = req.params;
 
     if (!id) {
@@ -725,8 +753,14 @@ const downloadInvoiceById = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${invoice.serial}.pdf"`);
     res.setHeader('Content-Length', buffer.length);
 
+    console.log("[INV][downloadInvoiceById] success", { id: invoice._id?.toString() });
     return res.send(buffer);
   } catch (error) {
+    console.error("[INV][downloadInvoiceById] error", {
+      message: error.message,
+      stack: error.stack,
+      params: req.params,
+    });
     return res.status(500).json({ success: false, message: error.message });
   }
 };
