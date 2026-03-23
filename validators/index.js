@@ -401,6 +401,41 @@ export const invoiceSchemas = {
     .strict(),
 };
 
+export const certificateSchemas = {
+  send: z
+    .object({
+      slug: slugSchema,
+      receiverEmail: emailSchema,
+      subject: optionalLooseString('subject', 180).optional(),
+      recipientName: z.string().trim().min(1, 'recipientName is required').max(200),
+      certificateType: optionalLooseString('certificateType', 64).optional(),
+      placement: optionalLooseString('placement', 64).optional(),
+      eventName: optionalLooseString('eventName', 160).optional(),
+      eventYear: optionalLooseString('eventYear', 32).optional(),
+      issueDate: optionalLooseString('issueDate', 64).optional(),
+      organizationName: optionalLooseString('organizationName', 160).optional(),
+      subtitle: optionalLooseString('subtitle', 240).optional(),
+      description: optionalLooseString('description', 2000).optional(),
+      signatures: authorizersSchema, // metadata for signatures (name, role)
+    })
+    .strict(),
+  download: z
+    .object({
+      slug: slugSchema,
+      recipientName: z.string().trim().min(1, 'recipientName is required').max(200),
+      certificateType: optionalLooseString('certificateType', 64).optional(),
+      placement: optionalLooseString('placement', 64).optional(),
+      eventName: optionalLooseString('eventName', 160).optional(),
+      eventYear: optionalLooseString('eventYear', 32).optional(),
+      issueDate: optionalLooseString('issueDate', 64).optional(),
+      organizationName: optionalLooseString('organizationName', 160).optional(),
+      subtitle: optionalLooseString('subtitle', 240).optional(),
+      description: optionalLooseString('description', 2000).optional(),
+      signatures: authorizersSchema,
+    })
+    .strict(),
+};
+
 export const eventSchemas = {
   addEvent: z
     .object({

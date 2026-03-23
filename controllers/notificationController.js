@@ -3,9 +3,10 @@ import cloudinary from "../configs/cloudinary.js";
 import axios from "axios";
 import streamifier from "streamifier";
 import { invoiceEmail, sendEmailWithAttachments } from "../utils/sendEmail.js";
-import { generatePadPDFWithPuppeteer, generateInvoicePDFWithPuppeteer } from "../utils/generatePDF_puppeteer.js";
+import { generatePadPDFWithPuppeteer, generateInvoicePDFWithPuppeteer, generateCertificatePDFWithPuppeteer } from "../utils/generatePDF_puppeteer.js";
 import PadStatement from "../models/padStatementModel.js";
 import Invoice from "../models/invoiceModel.js";
+import Certificate from "../models/certificateModel.js";
 
 const PAD_CLOUDINARY_FOLDER = "pads";
 
@@ -54,6 +55,49 @@ const uploadPadPdfToCloudinary = (buffer, publicId) =>
         resolve(result);
       }
     );
+
+    streamifier.createReadStream(buffer).pipe(uploadStream);
+  });
+
+const uploadCertificatePdfToCloudinary = (buffer, publicId) =>
+  new Promise((resolve, reject) => {
+    if (!Buffer.isBuffer(buffer)) return reject(new Error("PDF buffer is required for upload"));
+
+    const options = {
+      access_mode: "public",
+      resource_type: "raw",
+      folder: "certificates",
+      type: "upload",
+      overwrite: true,
+      format: "pdf",
+    };
+
+    if (publicId) {
+      options.public_id = String(publicId).replace(/^\/+/, "");
+    }
+
+    const uploadStream = cloudinary.uploader.upload_stream(options, (error, result) => {
+      if (error) return reject(error);
+      resolve(result);
+    });
+
+    streamifier.createReadStream(buffer).pipe(uploadStream);
+  });
+
+const uploadSignatureImageToCloudinary = (buffer, publicId) =>
+  new Promise((resolve, reject) => {
+    if (!Buffer.isBuffer(buffer)) return resolve(null);
+    const options = {
+      resource_type: "image",
+      folder: "certificate_signatures",
+      overwrite: true,
+    };
+    if (publicId) options.public_id = String(publicId).replace(/^\/+/, "");
+
+    const uploadStream = cloudinary.uploader.upload_stream(options, (error, result) => {
+      if (error) return reject(error);
+      resolve(result);
+    });
 
     streamifier.createReadStream(buffer).pipe(uploadStream);
   });
@@ -780,6 +824,299 @@ const listInvoiceHistory = async (req, res) => {
   }
 };
 
+// Certificates
+const sendCertificateEmail = async (req, res) => {
+  try {
+    const {
+      receiverEmail,
+      subject = 'Certificate from pcIST',
+      recipientName,
+      certificateType = 'participation',
+      placement = '',
+      eventName = '',
+      eventYear = new Date().getFullYear(),
+      issueDate,
+      organizationName = 'Programming Club of IST (pcIST)',
+      subtitle = '',
+      description = '',
+      signatures = [],
+    } = req.body;
+
+    if (!receiverEmail || !recipientName) {
+      return res.status(400).json({ success: false, message: 'receiverEmail and recipientName are required' });
+    }
+
+    // Collate signature items from body and uploaded files
+    const uploadedFiles = req.files || [];
+    let parsedSignatures = [];
+    if (signatures) {
+      try {
+        parsedSignatures = typeof signatures === 'string' ? JSON.parse(signatures) : signatures;
+      } catch (err) {
+        parsedSignatures = Array.isArray(signatures) ? signatures : [];
+      }
+    }
+
+    const mergedSignatures = [];
+    for (let i = 0; i < Math.max(parsedSignatures.length, uploadedFiles.length); i++) {
+      const meta = parsedSignatures[i] || {};
+      const file = uploadedFiles[i];
+      mergedSignatures.push({
+        name: meta.name || meta.fullName || '',
+        role: meta.role || meta.title || '',
+        org: meta.org || '',
+        image: file ? file.buffer : meta.image || null,
+      });
+    }
+
+    // Generate serial & date
+    const issuedAt = issueDate ? new Date(issueDate) : new Date();
+    const dateStr = issuedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    const generatedSerial = `CERT-${issuedAt.getFullYear()}-${String(Date.now()).slice(-6)}`;
+
+    // Generate PDF
+    const { buffer } = await generateCertificatePDFWithPuppeteer({
+      recipientName,
+      certificateType,
+      placement,
+      eventName,
+      eventYear,
+      issueDate: issuedAt,
+      organizationName,
+      subtitle,
+      description,
+      signatures: mergedSignatures,
+      serialPrefix: 'CERT',
+      serialNumber: generatedSerial,
+    });
+
+    // Upload signature images to cloudinary (optional) and collect urls for DB
+    const sigRecords = [];
+    for (let idx = 0; idx < mergedSignatures.length; idx++) {
+      const sig = mergedSignatures[idx];
+      let imageUrl = null;
+      try {
+        if (sig.image && Buffer.isBuffer(sig.image)) {
+          const up = await uploadSignatureImageToCloudinary(sig.image, `${generatedSerial}-sig-${idx + 1}`);
+          imageUrl = up?.secure_url || up?.url || null;
+        }
+      } catch (e) {
+        imageUrl = null;
+      }
+      sigRecords.push({ name: sig.name || '', role: sig.role || '', org: sig.org || '', imageUrl });
+    }
+
+    // Save certificate record
+    const cert = await Certificate.create({
+      serial: generatedSerial,
+      recipientName,
+      certificateType,
+      placement,
+      eventName,
+      eventYear,
+      issueDate: issuedAt,
+      dateStr,
+      organizationName,
+      subtitle,
+      description,
+      signatures: sigRecords,
+      createdBy: req.user?._id,
+      sentViaEmail: true,
+      sentAt: new Date(),
+    });
+
+    // Upload PDF to cloudinary
+    try {
+      const upPdf = await uploadCertificatePdfToCloudinary(buffer, cert._id.toString());
+      cert.pdfUrl = upPdf?.secure_url || upPdf?.url || null;
+      cert.pdfPublicId = upPdf?.public_id || null;
+      await cert.save();
+    } catch (e) {
+      // ignore upload errors
+    }
+
+    const html = `<p>Dear recipient,</p><p>Please find attached your certificate.</p><p>Certificate No: <strong>${generatedSerial}</strong><br/>Date: <strong>${dateStr}</strong></p>`;
+
+    await sendEmailWithAttachments({
+      emailTo: receiverEmail,
+      subject,
+      html,
+      attachments: [{ filename: `${generatedSerial}.pdf`, content: buffer }],
+    });
+
+    return res.status(200).json({ success: true, message: 'Certificate email sent', serial: generatedSerial, id: cert._id });
+  } catch (error) {
+    console.error('[CERT][sendCertificateEmail] error', error.message);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const downloadCertificatePDF = async (req, res) => {
+  try {
+    // Accept multipart/form-data with signature files
+    const {
+      recipientName,
+      certificateType = 'participation',
+      placement = '',
+      eventName = '',
+      eventYear = new Date().getFullYear(),
+      issueDate,
+      organizationName = 'Programming Club of IST (pcIST)',
+      subtitle = '',
+      description = '',
+    } = req.body;
+
+    if (!recipientName) return res.status(400).json({ success: false, message: 'recipientName is required' });
+
+    const uploadedFiles = req.files || [];
+    let parsedSignatures = [];
+    if (req.body.signatures) {
+      try {
+        parsedSignatures = typeof req.body.signatures === 'string' ? JSON.parse(req.body.signatures) : req.body.signatures;
+      } catch (e) {
+        parsedSignatures = Array.isArray(req.body.signatures) ? req.body.signatures : [];
+      }
+    }
+
+    const mergedSignatures = [];
+    for (let i = 0; i < Math.max(parsedSignatures.length, uploadedFiles.length); i++) {
+      const meta = parsedSignatures[i] || {};
+      const file = uploadedFiles[i];
+      mergedSignatures.push({
+        name: meta.name || meta.fullName || '',
+        role: meta.role || meta.title || '',
+        org: meta.org || '',
+        image: file ? file.buffer : meta.image || null,
+      });
+    }
+
+    const issuedAt = issueDate ? new Date(issueDate) : new Date();
+    const dateStr = issuedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    const generatedSerial = `CERT-${issuedAt.getFullYear()}-${String(Date.now()).slice(-6)}`;
+
+    const { buffer } = await generateCertificatePDFWithPuppeteer({
+      recipientName,
+      certificateType,
+      placement,
+      eventName,
+      eventYear,
+      issueDate: issuedAt,
+      organizationName,
+      subtitle,
+      description,
+      signatures: mergedSignatures,
+      serialPrefix: 'CERT',
+      serialNumber: generatedSerial,
+    });
+
+    // Save tracking record
+    const cert = new Certificate({
+      serial: generatedSerial,
+      recipientName,
+      certificateType,
+      placement,
+      eventName,
+      eventYear,
+      issueDate: issuedAt,
+      dateStr,
+      organizationName,
+      subtitle,
+      description,
+      signatures: mergedSignatures.map((s) => ({ name: s.name || '', role: s.role || '', org: s.org || '' })),
+      createdBy: req.user?._id,
+      sentViaEmail: false,
+      downloadedAt: new Date(),
+    });
+
+    try {
+      const upPdf = await uploadCertificatePdfToCloudinary(buffer, cert._id.toString());
+      cert.pdfUrl = upPdf?.secure_url || upPdf?.url || null;
+      cert.pdfPublicId = upPdf?.public_id || null;
+    } catch (e) {}
+
+    await cert.save();
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${generatedSerial}.pdf"`);
+    res.setHeader('Content-Length', buffer.length);
+
+    return res.send(buffer);
+  } catch (error) {
+    console.error('[CERT][downloadCertificatePDF] error', error.message);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const downloadCertificateById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Certificate id is required' });
+
+    const cert = await Certificate.findById(id);
+    if (!cert) return res.status(404).json({ success: false, message: 'Certificate not found' });
+
+    // Try to fetch pdf from stored url/public id
+    let buffer = null;
+    if (cert.pdfUrl) {
+      try {
+        const resp = await axios.get(cert.pdfUrl, { responseType: 'arraybuffer' });
+        buffer = Buffer.from(resp.data);
+      } catch (e) {
+        buffer = null;
+      }
+    }
+
+    if (!buffer) {
+      // Regenerate PDF using stored data
+      const signaturesForGen = (cert.signatures || []).map((s) => ({ name: s.name, role: s.role, org: s.org }));
+      const regenerated = await generateCertificatePDFWithPuppeteer({
+        recipientName: cert.recipientName,
+        certificateType: cert.certificateType,
+        placement: cert.placement,
+        eventName: cert.eventName,
+        eventYear: cert.eventYear,
+        issueDate: cert.issueDate,
+        organizationName: cert.organizationName,
+        subtitle: cert.subtitle,
+        description: cert.description,
+        signatures: signaturesForGen,
+        serialPrefix: 'CERT',
+        serialNumber: cert.serial,
+      });
+      buffer = regenerated.buffer;
+
+      try {
+        const upPdf = await uploadCertificatePdfToCloudinary(buffer, cert._id.toString());
+        cert.pdfUrl = upPdf?.secure_url || upPdf?.url || null;
+        cert.pdfPublicId = upPdf?.public_id || null;
+        await cert.save();
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    cert.downloadedAt = new Date();
+    await cert.save();
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${cert.serial}.pdf"`);
+    res.setHeader('Content-Length', buffer.length);
+    return res.send(buffer);
+  } catch (error) {
+    console.error('[CERT][downloadCertificateById] error', error.message);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const listCertificateHistory = async (req, res) => {
+  try {
+    const items = await Certificate.find({}).sort({ createdAt: -1 }).limit(200);
+    return res.status(200).json({ success: true, count: items.length, data: items });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export { 
   notifyAllUsers, 
   notifyOneUser, 
@@ -791,5 +1128,11 @@ export {
   downloadInvoicePDF,
   downloadInvoiceById,
   listInvoiceHistory
+  ,
+  sendCertificateEmail,
+  downloadCertificatePDF,
+  downloadCertificateById,
+  listCertificateHistory
 };
+
 

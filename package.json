@@ -8,7 +8,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "server": "nodemon server.js",
     "pdf:test": "node utils/pdf_test_runner.js",
-    "invoice:test": "node utils/invoice_test_runner.js"
+    "invoice:test": "node utils/invoice_test_runner.js",
+    "start": "node server.js"
   },
   "repository": {
     "type": "git",
@@ -24,15 +25,15 @@
   },
   "homepage": "https://github.com/nasemul1/pcist-backend#readme",
   "dependencies": {
-    "agenda": "^5.0.0",
     "@napi-rs/canvas": "^0.1.54",
+    "agenda": "^5.0.0",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^2.6.1",
     "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
+    "dotenv": "^16.6.1",
     "express": "^5.1.0",
-    "firebase-admin": "^13.4.0",
+    "firebase-admin": "^10.3.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.14.1",
     "multer": "^1.4.5-lts.2",

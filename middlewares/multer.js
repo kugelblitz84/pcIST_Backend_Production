@@ -114,4 +114,18 @@ const uploadPadStatementPdf = multer({
   },
 }).single("statementPdf");
 
-export {uploadEventImages, compressImages, uploadPadStatementPdf};
+const uploadCertificateSignatures = multer({
+  storage,
+  limits: {
+    fileSize: 3 * 1024 * 1024, // 3MB per signature
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'image/png' || file.mimetype === 'image/jpeg' || file.mimetype === 'image/jpg') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PNG or JPEG images are allowed for certificate signatures'), false);
+    }
+  },
+}).array('signatures', 3);
+
+export {uploadEventImages, compressImages, uploadPadStatementPdf, uploadCertificateSignatures};

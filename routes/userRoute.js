@@ -27,14 +27,19 @@ import {
   downloadInvoicePDF,
   downloadInvoiceById,
   listInvoiceHistory,
+  sendCertificateEmail,
+  downloadCertificatePDF,
+  downloadCertificateById,
+  listCertificateHistory,
 } from "../controllers/notificationController.js";
-import { uploadPadStatementPdf } from "../middlewares/multer.js";
+import { uploadPadStatementPdf, uploadCertificateSignatures } from "../middlewares/multer.js";
 import validateRequest from "../middlewares/validateRequest.js";
 import {
   userSchemas,
   padSchemas,
   invoiceSchemas,
   commonSchemas,
+  certificateSchemas,
 } from "../validators/index.js";
 
 const userRouter = express.Router();
@@ -44,6 +49,13 @@ const handlePadPdfUpload = (req, res, next) => {
     if (err) {
       return res.status(400).json({ success: false, message: err.message });
     }
+    return next();
+  });
+};
+
+const handleCertificateUpload = (req, res, next) => {
+  uploadCertificateSignatures(req, res, (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message });
     return next();
   });
 };
@@ -184,5 +196,31 @@ userRouter.get(
   downloadInvoiceById
 );
 userRouter.get("/invoice/history", treasurerAuth, listInvoiceHistory);
+
+// Certificate endpoints (admins)
+userRouter.post(
+  "/certificate/send",
+  handleCertificateUpload,
+  validateRequest({ body: certificateSchemas.send }),
+  adminAuth,
+  sendCertificateEmail
+);
+
+userRouter.post(
+  "/certificate/download",
+  handleCertificateUpload,
+  validateRequest({ body: certificateSchemas.download }),
+  adminAuth,
+  downloadCertificatePDF
+);
+
+userRouter.get(
+  "/certificate/download/:id",
+  validateRequest({ params: commonSchemas.objectIdParam }),
+  adminAuth,
+  downloadCertificateById
+);
+
+userRouter.get("/certificate/history", adminAuth, listCertificateHistory);
 
 export default userRouter;
